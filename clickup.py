@@ -168,6 +168,7 @@ class Clickup:
             clickupTask['description'] = task['description']
         if 'due_date' in task:
             clickupTask['due_date'] = task['due_date']
+            clickupTask['due_date_time'] = task['due_time']
         if 'priority' in task:
             clickupTask['priority'] = task['priority']
         if new == True:

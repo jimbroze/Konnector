@@ -5,18 +5,27 @@ import hashlib
 import uuid
 import logging
 import time, datetime
+from dateutil import tz
 
 import helpers
 
 logger = logging.getLogger(__name__)
 
-def convert_time(s):
-    format="%Y-%m-%dT%I:%M%S" if "T" in s else "%Y-%m-%d"
+def convert_time(s):  
+    if "T" in s:
+        format = "%Y-%m-%dT%H:%M:%S"
+        timeIncluded = True
+    else:
+        format = "%Y-%m-%d"
+        timeIncluded = False
     try:
-        time.mktime(date = datetime.datetime.strptime(s, format).timetuple())
+        date = datetime.datetime.strptime(s, format)
+        date = date.replace(tzinfo=tz.gettz('Europe/London'))
+        date = date.astimezone(tz.gettz('UTC'))
+        epochTime = time.mktime(date.timetuple())*1000
     except ValueError:
-        date = None
-    return date
+        epochTime = None
+    return epochTime, timeIncluded
 
 
 
@@ -120,7 +129,7 @@ class Todoist:
             task['description'] = data['event_data']['description']
 
         if data['event_data']['due'] != "None":
-            task['due_date'] = data['event_data']['due']['date']
+            task['due_date'], task['due_time'] = convert_time(data['event_data']['due']['date'])
         if data['event_data']['priority'] > 1:
             # Priority is reversed (4 is actually 1)
             task['priority'] = 5 - data['event_data']['priority']
