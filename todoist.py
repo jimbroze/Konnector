@@ -2,6 +2,7 @@ import os
 import base64
 import hmac
 import hashlib
+from pickle import TRUE
 import uuid
 import logging
 import datetime
@@ -9,6 +10,15 @@ import datetime
 import helpers
 
 logger = logging.getLogger(__name__)
+
+def convert_time(s):
+    format="%Y-%m-%dT%I:%M%SZ" if "T" in s else "%Y-%m-%d"
+    try:
+        date = datetime.datetime.strptime(s, format)
+    except ValueError:
+        date = None
+    return date
+
 
 
 class Todoist:
@@ -96,6 +106,7 @@ class Todoist:
                 'X-Request-Id': str(uuid.uuid4())
             }, reqType, data)
 
+
     def task_received(self, data):
         task = {
             'todoist_id': data['event_data']['id'],
@@ -110,7 +121,7 @@ class Todoist:
             task['description'] = data['event_data']['description']
 
         if data['event_data']['due'] != "None":
-            task['due_date'] = datetime.strptime(data['event_data']['due']['datetime'], '%Y-%m-%dT%I:%M%SZ')
+            task['due_date'] = ['event_data']['due']['date']
         if data['event_data']['priority'] > 1:
             # Priority is reversed (4 is actually 1)
             task['priority'] = 5 - data['event_data']['priority']
