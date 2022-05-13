@@ -4,6 +4,7 @@ import hmac
 import hashlib
 import uuid
 import logging
+import datetime
 
 import helpers
 
@@ -109,7 +110,7 @@ class Todoist:
             task['description'] = data['event_data']['description']
 
         if data['event_data']['due'] != "None":
-            task['due_date'] = data['event_data']['due']
+            task['due_date'] = datetime.strptime(data['event_data']['due']['datetime'], '%Y-%m-%dT%I:%M%SZ')
         if data['event_data']['priority'] > 1:
             # Priority is reversed (4 is actually 1)
             task['priority'] = 5 - data['event_data']['priority']
