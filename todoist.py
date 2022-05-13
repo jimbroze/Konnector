@@ -2,19 +2,18 @@ import os
 import base64
 import hmac
 import hashlib
-from pickle import TRUE
 import uuid
 import logging
-import datetime
+import time, datetime
 
 import helpers
 
 logger = logging.getLogger(__name__)
 
 def convert_time(s):
-    format="%Y-%m-%dT%I:%M%SZ" if "T" in s else "%Y-%m-%d"
+    format="%Y-%m-%dT%I:%M%S" if "T" in s else "%Y-%m-%d"
     try:
-        date = datetime.datetime.strptime(s, format)
+        time.mktime(date = datetime.datetime.strptime(s, format).timetuple())
     except ValueError:
         date = None
     return date
@@ -121,7 +120,7 @@ class Todoist:
             task['description'] = data['event_data']['description']
 
         if data['event_data']['due'] != "None":
-            task['due_date'] = ['event_data']['due']['date']
+            task['due_date'] = data['event_data']['due']['date']
         if data['event_data']['priority'] > 1:
             # Priority is reversed (4 is actually 1)
             task['priority'] = 5 - data['event_data']['priority']

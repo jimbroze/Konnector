@@ -2,7 +2,6 @@ import os
 import hmac
 import hashlib
 import logging
-import time, datetime
 
 import helpers
 
@@ -168,7 +167,7 @@ class Clickup:
         if 'description' in task:
             clickupTask['description'] = task['description']
         if 'due_date' in task:
-            clickupTask['due_date'] = time.mktime(task['due_date'].timetuple())
+            clickupTask['due_date'] = task['due_date']
         if 'priority' in task:
             clickupTask['priority'] = task['priority']
         if new == True:
