@@ -127,8 +127,7 @@ class Todoist:
             task['clickup_id'] = data['event_data']['description']
         else:
             task['description'] = data['event_data']['description']
-
-        if data['event_data']['due'] != "None":
+        if "due" in data['event_data'] and data['event_data']['due'] is not None:
             task['due_date'], task['due_time'] = convert_time(data['event_data']['due']['date'])
         if data['event_data']['priority'] > 1:
             # Priority is reversed (4 is actually 1)
