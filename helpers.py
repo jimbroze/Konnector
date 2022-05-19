@@ -1,5 +1,6 @@
 import requests
 import logging
+
 # from flask import jsonify, make_response
 
 logger = logging.getLogger(__name__)
@@ -16,9 +17,9 @@ def send_request(url, headers, reqType="GET", data={}):
     except requests.exceptions.RequestException as e:
         logger.error(e)
         logger.error(f"request type {reqType}. headers: {headers}. data: {data}")
-        
+
         raise
-    if 'application/json' in response.headers.get('Content-Type'):
+    if "application/json" in response.headers.get("Content-Type"):
         logger.debug(response.json())
         return response.json()
     else:
