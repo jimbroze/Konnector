@@ -30,6 +30,7 @@ def convert_time(s):
 
 
 class Todoist:
+    name = "Todoist"
     clientId = os.environ['TODOIST_CLIENT_ID']
     secret = os.environ['TODOIST_SECRET']
     state = os.environ['TODOIST_STATE']
@@ -45,13 +46,14 @@ class Todoist:
     projects = {
         'inbox': "2200213434",
         'alexa': "2231741057",
+        # 'food': ""
         'next_actions': "2284385839"
     }
-    projectEvents = {
-        'item:added': ["inbox", "alexa"],
-        'item:completed': ["next_actions"],
-        'item:updated': ["next_actions"]
-    }
+    # projectEvents = {
+    #     'item:added': ["inbox", "alexa"],
+    #     'item:completed': ["next_actions"],
+    #     'item:updated': ["next_actions"]
+    # }
 
     def __init__(self):
         """"""
@@ -76,7 +78,11 @@ class Todoist:
             'access_token'] else response['error']
 
     def check_request(self, request):
-        # CHeck headers are valid and event is new task.
+        """Check headers are valid and get the event.
+        Returns dict with:
+        - data
+        - event.
+        """
         logger.info(f"Todoist request received:")
         logger.debug(f"request: {request.get_data()}")
         if request.headers['User-Agent'] != "Todoist-Webhooks":
@@ -90,21 +96,21 @@ class Todoist:
             raise Exception("Bad HMAC")
         if str(data['user_id']) != self.userId:
             raise Exception("Invalid User")
-        event = self._check_project(data['event_name'],
-                                    data['event_data']['project_id'])
-        return {'data': data, 'event': event}
+        event = self._check_event(data['event_name'])
+        project = self._check_project(data['event_data']['project_id'])
+        return {'data': data, 'event': event, 'list': project}
 
-    def _check_project(self, todoistEvent, projectId):
+    def _check_project(self, projectId):
         projectId = str(projectId)
-        projectName = next(key for key, value in self.projects.items()
-                           if value == projectId)
         if projectId not in self.projects.values():
             raise Exception(f"Invalid Todoist project: {projectId}")
-        # if todoistEvent not in self.projectEvents[projectId]:
-        if projectName not in self.projectEvents[todoistEvent]:
-            raise Exception(
-                f"Event {todoistEvent} not set for Todoist project {projectId}"
-            )
+        projectName = next(key for key, value in self.projects.items()
+                           if value == projectId)
+        return projectName
+
+    def _check_event(self, todoistEvent):
+        if todoistEvent not in self.events:
+            raise Exception(f"Invalid Todoist event: {todoistEvent}")
         return self.events[todoistEvent]
 
     def _send_request(self, location, reqType="GET", data={}):
@@ -153,17 +159,17 @@ class Todoist:
         logger.debug(todoistTask)
         return todoistTask
 
-    def create_new_task(self, task, project=""):
+    def create_task(self, task, project):
+        projectId = self.projects[project]
         # Check if ID already exists
         projectTasks = self._send_request(
-            f"/tasks?project_id={self.projects[project]}", "GET")
+            f"/tasks?project_id={projectId}", "GET")
         for projectTask in projectTasks:
             if str(projectTask['description']) == str(task['clickup_id']):
                 raise Exception(
                     "Clickup ID already exists in Todoist project.")
 
-        todoistTask = self._convert_task(task, project)
-
+        todoistTask = self._convert_task(task, projectId)
         response = self._send_request("/tasks", "POST", todoistTask)
         return {'todoist_id': response['id'], **response}
 

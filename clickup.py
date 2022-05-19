@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class Clickup:
+    name = "Clickup"
     accessToken = os.environ['CLICKUP_TOKEN']
     workspace = "2193273"
     clickupEvents = [
@@ -180,9 +181,8 @@ class Clickup:
         logger.debug(f"Clickup Task: {clickupTask}")
         return clickupTask
 
-    def create_new_task(self, task):
-        listId = self.lists['inbox']
-
+    def create_task(self, task, list):
+        listId = self.lists[list]
         # Check for existing ID
         queryParams = 'custom_fields=[{"field_id":"' + self.customFieldTodoist + '","operator":"=","value":' + str(
             task['todoist_id']) + "}]"
