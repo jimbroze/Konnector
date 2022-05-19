@@ -90,8 +90,7 @@ class Todoist:
         - data
         - event.
         """
-        logger.info(f"Todoist request received:")
-        logger.debug(f"request: {request.get_data()}")
+        logger.info(f"Todoist request received. Checking headers.")
         if request.headers["User-Agent"] != "Todoist-Webhooks":
             return {"error": "Bad user agent"}
         calcHmac = base64.b64encode(
@@ -101,9 +100,11 @@ class Todoist:
                 digestmod=hashlib.sha256,
             ).digest()
         ).decode("utf-8")
-        data = request.get_json(force=True)
         if request.headers["X-Todoist-Hmac-SHA256"] != calcHmac:
             raise Exception("Bad HMAC")
+
+        data = request.get_json(force=True)
+        logger.debug(f"Headers check OK. Request data: {data}")
         if str(data["user_id"]) != self.userId:
             raise Exception("Invalid User")
         event = self._check_event(data["event_name"])
@@ -112,12 +113,11 @@ class Todoist:
 
     def _check_project(self, projectId):
         projectId = str(projectId)
+
         if projectId not in self.projects.values():
             raise Exception(f"Invalid Todoist project: {projectId}")
-        projectName = next(
-            key for key, value in self.projects.items() if value == projectId
-        )
-        logger.debug(f"Todoist project: {projectName()}")
+        projectName = [key for key, value in self.projects.items() if value == projectId][0]
+        logger.debug(f"Todoist project: {projectName}")
         return projectName
 
     def _check_event(self, todoistEvent):

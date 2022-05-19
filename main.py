@@ -62,10 +62,10 @@ elif AUTH == "clickup":
 @app.route("/todoist/webhook", methods=["POST"])
 def todoist_webhook():
     try:
-        [data, event, list] = todoist.check_request(request)
-        task = todoist.task_received(data)
-        if event == "new_task":
-            if list in ["inbox", "alexa-todo"]:
+        todoistRequest = todoist.check_request(request)
+        task = todoist.task_received(todoistRequest['data'])
+        if todoistRequest['event'] == "new_task":
+            if todoistRequest['list'] in ["inbox", "alexa-todo"]:
                 return move_task(
                     {"platform": todoist, "list": "inbox", "task": task},
                     {"platform": clickup, "list": "inbox"},
@@ -73,12 +73,12 @@ def todoist_webhook():
                 )
             # If in list = food:
             # return move_task(todoist, clickup, "inbox", "foodLog", task)
-        elif event == "task_updated":
-            return todoist_task_modified(task, event)
-        elif event == "task_complete":
-            return todoist_task_modified(task, event)
+        elif todoistRequest['event'] == "task_updated":
+            return todoist_task_modified(task, todoistRequest['event'])
+        elif todoistRequest['event'] == "task_complete":
+            return todoist_task_modified(task, todoistRequest['event'])
         else:
-            raise Exception(f"Unknown Todoist event: {event}")
+            raise Exception(f"Unknown Todoist event: {todoistRequest['event']}")
     except Exception as e:
         logging.warning(f"Error in processing Todoist webhook: {e}")
         return make_response(repr(e), 202)
