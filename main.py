@@ -40,7 +40,6 @@ if AUTH == "todoist":
     def todoist_callback():
         return todoist.auth_callback(request)
 
-
 elif AUTH == "clickup":
 
     @app.route("/clickup/webhook/add")
@@ -63,20 +62,29 @@ elif AUTH == "clickup":
 def todoist_webhook():
     try:
         todoistRequest = todoist.check_request(request)
-        task = todoist.task_received(todoistRequest['data'])
-        if todoistRequest['event'] == "new_task":
-            if todoistRequest['list'] in ["inbox", "alexa-todo"]:
-                return move_task(
-                    {"platform": todoist, "list": "inbox", "task": task},
-                    {"platform": clickup, "list": "inbox"},
-                    True,
-                )
+        task = todoist.task_received(todoistRequest["data"])
+        if todoistRequest["event"] == "new_task":
+            match todoistRequest["list"]:
+                case ("inbox" | "alexa-todo"):
+                    # if todoistRequest['list'] in ["inbox", "alexa-todo"]:
+                    outList = "inbox"
+                case "food_log":
+                    outList = "food_log"
+                case _:
+                    raise Exception(
+                        f"Invalid Todoist list for new task: {todoistRequest['list']}"
+                    )
+            return move_task(
+                {"platform": todoist, "list": todoistRequest["list"], "task": task},
+                {"platform": clickup, "list": outList},
+                True,
+            )
             # If in list = food:
             # return move_task(todoist, clickup, "inbox", "foodLog", task)
-        elif todoistRequest['event'] == "task_updated":
-            return todoist_task_modified(task, todoistRequest['event'])
-        elif todoistRequest['event'] == "task_complete":
-            return todoist_task_modified(task, todoistRequest['event'])
+        elif todoistRequest["event"] == "task_updated":
+            return todoist_task_modified(task, todoistRequest["event"])
+        elif todoistRequest["event"] == "task_complete":
+            return todoist_task_modified(task, todoistRequest["event"])
         else:
             raise Exception(f"Unknown Todoist event: {todoistRequest['event']}")
     except Exception as e:

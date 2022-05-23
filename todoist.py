@@ -51,7 +51,7 @@ class Todoist:
     projects = {
         "inbox": "2200213434",
         "alexa": "2231741057",
-        # 'food': ""
+        'food_log': "2291635541",
         "next_actions": "2284385839",
     }
     # projectEvents = {
@@ -116,7 +116,9 @@ class Todoist:
 
         if projectId not in self.projects.values():
             raise Exception(f"Invalid Todoist project: {projectId}")
-        projectName = [key for key, value in self.projects.items() if value == projectId][0]
+        projectName = [
+            key for key, value in self.projects.items() if value == projectId
+        ][0]
         logger.debug(f"Todoist project: {projectName}")
         return projectName
 

@@ -20,7 +20,7 @@ class Clickup:
         "taskDeleted": "task_deleted",
         "taskStatusUpdated": "task_removed",
     }
-    lists = {"inbox": "38260663"}
+    lists = {"inbox": "38260663", "food_log": "176574082"}
     listStatuses = {
         "38260663": ["next action", "complete"],
     }
@@ -179,7 +179,7 @@ class Clickup:
             clickupTask["priority"] = task["priority"]
         if new == True:
             clickupTask["assignees"] = [self.userId[0]]
-            clickupTask["custom_fields"]: [
+            clickupTask["custom_fields"] = [
                 {
                     "id": self.customFieldTodoist,  # Todoist ID
                     "value": str(task["todoist_id"]),
