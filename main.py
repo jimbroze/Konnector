@@ -64,16 +64,15 @@ def todoist_webhook():
         todoistRequest = todoist.check_request(request)
         task = todoist.task_received(todoistRequest["data"])
         if todoistRequest["event"] == "new_task":
-            match todoistRequest["list"]:
-                case ("inbox" | "alexa-todo"):
-                    # if todoistRequest['list'] in ["inbox", "alexa-todo"]:
-                    outList = "inbox"
-                case "food_log":
-                    outList = "food_log"
-                case _:
-                    raise Exception(
-                        f"Invalid Todoist list for new task: {todoistRequest['list']}"
-                    )
+            if todoistRequest["list"] in ["inbox", "alexa-todo"]:
+                # if todoistRequest['list'] in ["inbox", "alexa-todo"]:
+                outList = "inbox"
+            elif todoistRequest["list"] == "food_log":
+                outList = "food_log"
+            else:
+                raise Exception(
+                    f"Invalid Todoist list for new task: {todoistRequest['list']}"
+                )
             return move_task(
                 {"platform": todoist, "list": todoistRequest["list"], "task": task},
                 {"platform": clickup, "list": outList},
