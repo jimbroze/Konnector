@@ -255,6 +255,9 @@ class Clickup:
         response = self._send_request(f"task/{taskId}", "PUT", data)
         return response
 
+    def delete_task(self, todoistTask):
+        return self.complete_task(todoistTask)
+
     def update_task(self, task):
         taskId = task["clickup_id"]
         response = self._send_request(f"task/{str(taskId)}")
