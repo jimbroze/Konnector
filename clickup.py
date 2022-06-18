@@ -155,8 +155,7 @@ class Clickup:
         if "due_date" in clickupTask and clickupTask["due_date"] != "None":
             outTask["due_date"] = clickupTask["due_date"]
         if "priority" in clickupTask and clickupTask["priority"] != "None":
-            # Priority is reversed (When 4 becomes ooooooooone)
-            outTask["priority"] = clickupTask["priority"]
+            outTask["priority"] = clickupTask["priority"]["id"]
         if "clickup_complete" in clickupTask:
             outTask["clickup_complete"] = (
                 True if clickupTask["status"] == "complete" else False

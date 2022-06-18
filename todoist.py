@@ -163,7 +163,8 @@ class Todoist:
                 todoistTask["due"]["date"]
             )
         if todoistTask["priority"] > 1:
-            # Priority is reversed (4 is actually 1)
+            # Priority is reversed (When 4 becomes ooooooooone)
+            # in Todoist, 4 is highest.
             outTask["priority"] = 5 - todoistTask["priority"]
         return outTask
 
