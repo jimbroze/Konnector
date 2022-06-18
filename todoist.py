@@ -168,6 +168,7 @@ class Todoist:
             outTask["priority"] = 5 - todoistTask["priority"]
         return outTask
 
+    # TODO rename method?
     def get_task(self, data):
         outTask = self._normalize_task(data["event_data"])
         logger.debug(f"Normalized Todoist task: {outTask}")
@@ -212,11 +213,25 @@ class Todoist:
         response = self._send_request(f"/tasks/{taskId}/close", "POST")
         return response
 
+    def check_if_task_exists(self, task):
+        if "todoist_id" not in task:
+            logging.debug("No todoist Id.")
+            return False
+        try:
+            response = self._send_request(f"/tasks/{task['todoist_id']}")
+        except:
+            logging.debug("Error retrieving task.")
+            return False
+        if response.status_code == 204:
+            logging.debug("No task found.")
+            return False
+        if response["completed"] == True:
+            logging.debug("Todoist task already complete")
+            return False
+
     def update_task(self, task):
         taskId = task["todoist_id"]
-        response = self._send_request(f"/tasks/{taskId}")
-        if response["completed"] == True:
-            logging.warning("Todoist task already complete")
+        if self.check_if_task_exists(task):
             return False
         taskUpdates = task["updates"] if "updates" in task else task
         todoistTask = self._convert_task(taskUpdates)
