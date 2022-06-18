@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class Clickup:
-    name = "Clickup"
+    name = "clickup"
     accessToken = os.environ["CLICKUP_TOKEN"]
     workspace = "2193273"
     clickupEvents = ["taskUpdated", "taskDeleted", "taskStatusUpdated"]
@@ -161,9 +161,13 @@ class Clickup:
             outTask["clickup_complete"] = (
                 True if clickupTask["status"] == "complete" else False
             )
-        for customField in clickupTask["custom_fields"]:
-            if customField["id"] == self.customFieldTodoist and "value" in customField:
-                outTask["todoist_id"] = customField["value"]
+        if "custom_fields" in clickupTask:
+            for customField in clickupTask["custom_fields"]:
+                if (
+                    customField["id"] == self.customFieldTodoist
+                    and "value" in customField
+                ):
+                    outTask["todoist_id"] = customField["value"]
         return outTask
 
     def get_task(self, data):

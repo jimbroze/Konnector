@@ -30,7 +30,7 @@ def convert_time(s):
 
 
 class Todoist:
-    name = "Todoist"
+    name = "todoist"
     clientId = os.environ["TODOIST_CLIENT_ID"]
     secret = os.environ["TODOIST_SECRET"]
     state = os.environ["TODOIST_STATE"]

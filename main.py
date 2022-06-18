@@ -94,8 +94,6 @@ def todoist_webhook():
             clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
         elif todoistRequest["event"] == "task_complete":
             clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
-        else:
-            raise Exception(f"Unknown Todoist event: {todoistRequest['event']}")
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing Todoist webhook: {e}")
@@ -137,8 +135,6 @@ def clickup_webhook_received():
             elif todoistTask != False and todoistTask["list"] == "next_actions":
                 logger.info(f"Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
-        else:
-            raise Exception(f"Unknown Clickup event/status: {clickupRequest['event']}")
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing clickup webhook: {e}")
@@ -167,8 +163,8 @@ def modify_task(input, output, event):
     logger.info(
         f"Attempting to modify task from {inPlatformName} on {outPlatformName}.  Event: {event}"
     )
-    if not checkId(input["task"], inPlatformName):
-        logger.debug(f"No valid id for {inPlatformName}.")
+    if not checkId(input["task"], outPlatformName):
+        logger.debug(f"No valid id for {outPlatformName}.")
         return False
     outputTask = {
         "task_complete": output["platform"].complete_task,
