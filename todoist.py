@@ -185,6 +185,8 @@ class Todoist:
             todoistTask["date_string"] = task["due_date"]
         if projectId != "":
             todoistTask["project_id"] = projectId
+        if "priority" in task:
+            todoistTask["priority"] = 5 - task["priority"]
         logger.debug(todoistTask)
         return todoistTask
 
@@ -222,7 +224,7 @@ class Todoist:
         except:
             logging.debug("Error retrieving task.")
             return False
-        if response.status_code == 204:
+        if response is None or response == {} or response == "":
             logging.debug("No task found.")
             return False
         if response["completed"] == True:
