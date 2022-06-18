@@ -173,17 +173,17 @@ class Todoist:
         logger.debug(f"Normalized Todoist task: {outTask}")
         return outTask
 
-    def _convert_task(self, task, project=""):
+    def _convert_task(self, task, projectId=""):
         todoistTask = {}
         if "name" in task:
             todoistTask["content"] = task["name"]
         if "clickup_id" in task:
             todoistTask["description"] = task["clickup_id"]
             # Change if non-clickup tasks are added.
-        if "due_date" in task:
+        if "due_date" in task and task["due_date"] is not None:
             todoistTask["date_string"] = task["due_date"]
-        if project != "":
-            todoistTask["project_id"] = self.projects[project]
+        if projectId != "":
+            todoistTask["project_id"] = projectId
         logger.debug(todoistTask)
         return todoistTask
 
