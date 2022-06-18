@@ -147,15 +147,7 @@ class Clickup:
         )
 
     def _normalize_task(self, clickupTask):
-        outTask = {
-            "clickup_id": (
-                clickupTask["custom_id"]
-                if "custom_id" in clickupTask and clickupTask["custom_id"] is not None
-                else clickupTask["id"]
-            )
-        }
-        outTask = {"clickup_id": clickupTask["id"]}
-
+        outTask = {}
         if "name" in clickupTask:
             outTask["name"] = clickupTask["name"]
         if "description" in clickupTask:
@@ -172,10 +164,19 @@ class Clickup:
         for customField in clickupTask["custom_fields"]:
             if customField["id"] == self.customFieldTodoist and "value" in customField:
                 outTask["todoist_id"] = customField["value"]
+        return outTask
 
     def get_task(self, data):
+        logger.debug(f"Getting Clickup Task")
         clickupTask = self._send_request("task/" + str(data["task_id"]))
-        outTask = self._normalize_task(clickupTask)
+        outTask = {
+            "clickup_id": (
+                clickupTask["custom_id"]
+                if "custom_id" in clickupTask and clickupTask["custom_id"] is not None
+                else clickupTask["id"]
+            ),
+            **self._normalize_task(clickupTask),
+        }
         # Include updated data separately
         if "history_items" in data:
             clickupTaskUpdates = {}

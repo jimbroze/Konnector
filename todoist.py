@@ -165,6 +165,7 @@ class Todoist:
         if todoistTask["priority"] > 1:
             # Priority is reversed (4 is actually 1)
             outTask["priority"] = 5 - todoistTask["priority"]
+        return outTask
 
     def get_task(self, data):
         outTask = self._normalize_task(data["event_data"])
