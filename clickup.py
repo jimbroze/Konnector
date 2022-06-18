@@ -18,7 +18,7 @@ class Clickup:
         "complete": "task_complete",
         "taskUpdated": "task_updated",
         "taskDeleted": "task_deleted",
-        "taskStatusUpdated": "task_removed",
+        # "taskStatusUpdated": "task_removed",
     }
     lists = {"inbox": "38260663", "food_log": "176574082"}
     listStatuses = {

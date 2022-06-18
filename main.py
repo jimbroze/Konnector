@@ -121,7 +121,7 @@ def clickup_webhook_received():
             # Returns False if no task in Todoist
             todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
         # Clickup task into todoist next_actions:
-        if todoistTask != False and clickupRequest["event"] in ["task_updated"]:
+        if clickupRequest["event"] in ["task_updated"]:
             outputData["list"] = "next_actions"
             # Check if valid for next actions
             # (high priority, due date < 1 week, no project.)
@@ -130,11 +130,14 @@ def clickup_webhook_received():
                 or max_days_diff(clickupTask["due_date"], days=3)
                 or not clickup.is_subtask(clickupTask)
             ):
-                if todoistTask["list"] != "next_actions":
-                    # add to next actions
+                logger.info(f"Task is valid for next actions list.")
+                if todoistTask == False:
+                    logger.info(f"Adding task to next actions list.")
                     todoistTask = move_task(inputData, outputData, deleteTask=False)
-            elif todoistTask["list"] == "next_actions":
-                # remove from next actions
+                else:
+                    logger.info(f"Task is already in next actions list.")
+            elif todoistTask != False and todoistTask["list"] == "next_actions":
+                logger.info(f"Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
         else:
             raise Exception(f"Unknown Clickup event/status: {clickupRequest['event']}")
@@ -167,6 +170,7 @@ def modify_task(input, output, event):
         f"Attempting to modify task from {inPlatformName} on {outPlatformName}.  Event: {event}"
     )
     if not checkId(input["task"], inPlatformName):
+        logger.debug(f"No valid id for {inPlatformName}.")
         return False
     outputTask = {
         "task_complete": output["platform"].complete_task,
