@@ -4,6 +4,7 @@ from clickup import Clickup
 
 # import helpers
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,11 @@ app = Flask(__name__)
 todoist = Todoist()
 clickupEndpoint = ENDPOINT + clickupEndpointQuery
 clickup = Clickup(clickupEndpoint)
+
+
+def max_days_diff(dateIn, days):
+    cutoff = time.time() + days * 86400
+    return True if dateIn < cutoff else False
 
 
 @app.route("/")
@@ -56,36 +62,41 @@ elif AUTH == "clickup":
 #       next_action: task
 #   completed: task
 #       next_action: task
+# Clickup:
+#   updated: task
+#       next_action: task
+#   completed: task
+#       next_action: task
 
 # Todoist webhooks.
 @app.route("/todoist/webhook", methods=["POST"])
 def todoist_webhook():
     try:
         todoistRequest = todoist.check_request(request)
-        task = todoist.task_received(todoistRequest["data"])
+        todoistTask = todoist.task_received(todoistRequest["data"])
+        inputData = {
+            "platform": todoist,
+            "list": todoistRequest["list"],
+            "task": todoistTask,
+        }
+        outputData = {"platform": clickup}
         if todoistRequest["event"] == "new_task":
             if todoistRequest["list"] in ["inbox", "alexa-todo"]:
-                # if todoistRequest['list'] in ["inbox", "alexa-todo"]:
-                outList = "inbox"
+                outputData["list"] = "inbox"
             elif todoistRequest["list"] == "food_log":
-                outList = "food_log"
+                outputData["list"] = "food_log"
             else:
                 raise Exception(
                     f"Invalid Todoist list for new task: {todoistRequest['list']}"
                 )
-            return move_task(
-                {"platform": todoist, "list": todoistRequest["list"], "task": task},
-                {"platform": clickup, "list": outList},
-                True,
-            )
-            # If in list = food:
-            # return move_task(todoist, clickup, "inbox", "foodLog", task)
+            clickupTask = move_task(inputData, outputData, deleteTask=True)
         elif todoistRequest["event"] == "task_updated":
-            return todoist_task_modified(task, todoistRequest["event"])
+            clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
         elif todoistRequest["event"] == "task_complete":
-            return todoist_task_modified(task, todoistRequest["event"])
+            clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
         else:
             raise Exception(f"Unknown Todoist event: {todoistRequest['event']}")
+        return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing Todoist webhook: {e}")
         return make_response(repr(e), 202)
@@ -95,17 +106,39 @@ def todoist_webhook():
 @app.route(clickupEndpointQuery, methods=["POST"])
 def clickup_webhook_received():
     try:
-        response = clickup.check_request(request)
-
-        update = True if response["event"] == "task_updated" else False
-        task = clickup.task_received(response["data"], update)
-
-        if response["event"] == "next_action":
-            return task_into_next_actions(task)
-        elif response["event"] in ["task_complete", "task_updated", "task_removed"]:
-            return clickup_task_modified(task, response["event"])
+        clickupRequest = clickup.check_request(request)
+        clickupTask = clickup.task_received(
+            clickupRequest["data"], clickupRequest["update"]
+        )
+        inputData = {
+            "platform": clickup,
+            "list": clickupRequest["list"],
+            "task": clickupTask,
+        }
+        outputData = {"platform": todoist}
+        # Update Clickup task in Todoist
+        if clickupRequest["event"] in ["task_complete", "task_updated", "task_removed"]:
+            # Returns False if no task in Todoist
+            todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
+        # Clickup task into todoist next_actions:
+        if todoistTask != False and clickupRequest["event"] in ["task_updated"]:
+            outputData["list"] = "next_actions"
+            # Check if valid for next actions
+            # (high priority, due date < 1 week, no project.)
+            if (
+                clickupTask["priority"] < 3
+                or max_days_diff(clickupTask["due_date"], days=3)
+                or not clickup.is_subtask(clickupTask)
+            ):
+                if todoistTask["list"] != "next_actions":
+                    # add to next actions
+                    todoistTask = move_task(inputData, outputData, deleteTask=False)
+            elif todoistTask["list"] == "next_actions":
+                # remove from next actions
+                todoist.delete_task(clickupTask)
         else:
-            raise Exception(f"Unknown Clickup event/status: {response['event']}")
+            raise Exception(f"Unknown Clickup event/status: {clickupRequest['event']}")
+        return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing clickup webhook: {e}")
         return make_response(repr(e), 202)
@@ -117,67 +150,38 @@ def move_task(input, output, deleteTask=False):
     logger.info(
         f"Attempting to add new task from {inPlatformName}-{input['list']} to {outPlatformName}-{output['list']}"
     )
-    outTask = output["platform"].create_task(input["task"], output["list"])
+    outputTask = output["platform"].create_task(input["task"], output["list"])
     logger.info(f"Successfully added new task to {outPlatformName}.")
     if deleteTask == True:
-        logger.info(f"Attempting to delete from {inPlatformName}")
+        logger.info(f"Attempting to delete new task from {inPlatformName}")
+        # Possibly add option to remove task, without completing, in future?
         input["platform"].complete_task(input["task"])
         logger.info(f"Successfully deleted new task from {inPlatformName}")
-    return make_response(
-        jsonify(
-            {
-                f"Input task - {inPlatformName}": input["task"],
-                f"Output task - {outPlatformName}": outTask,
-            }
-        ),
-        202,
+    return outputTask
+
+
+def modify_task(input, output, event):
+    inPlatformName = input["platform"].name
+    outPlatformName = output["platform"].name
+    logger.info(
+        f"Attempting to modify task from {inPlatformName} on {outPlatformName}.  Event: {event}"
     )
-
-
-def task_into_next_actions(clickupTask):
-    logger.info("Attempting to add task to Todoist Next Actions")
-    checkId(clickupTask, "clickup")
-    clickup.check_if_subtask(clickupTask)
-    todoistTask = todoist.create_task(clickupTask, "next_actions")
-    clickupTask = clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
-
-    logger.info("Successfully added next-action task to Todoist")
-    return make_response(
-        jsonify({"clickup_task": clickupTask, "todoist_task": todoistTask}), 202
+    if not checkId(input["task"], inPlatformName):
+        return False
+    outputTask = {
+        "task_complete": output["platform"].complete_task,
+        "task_updated": output["platform"].update_task,
+        "task_removed": output["platform"].delete_task,
+    }[event](input["task"])
+    logger.info(
+        f"Successfully completed event: '{event}' from {inPlatformName} task to {outPlatformName} task"
     )
-
-
-def todoist_task_modified(todoistTask, event):
-    logger.info(f"Attempting to run event: {event} on Clickup Task")
-    checkId(todoistTask, "todoist")
-    clickupTask = {
-        "task_complete": clickup.complete_task,
-        "task_updated": clickup.update_task,
-        # 'task_removed': clickup.remove_task
-    }[event](todoistTask)
-    logger.info(f"Successfully completed event: '{event}' on Clickup task")
-    return make_response(
-        jsonify({"todoist_task": todoistTask, "clickup_task": clickupTask}), 202
-    )
-
-
-def clickup_task_modified(clickupTask, event):
-    logger.info(f"Attempting to run event: {event} on Todoist Task")
-    checkId(clickupTask, "clickup")
-    todoistTask = {
-        "task_complete": todoist.complete_task,
-        "task_updated": todoist.update_task,
-        "task_removed": todoist.delete_task,
-    }[event](clickupTask)
-    logger.info(f"Successfully completed event: '{event}' on Todoist task")
-    return make_response(
-        jsonify({"clickup_task": clickupTask, "todoist_task": todoistTask}), 202
-    )
+    return outputTask
 
 
 def checkId(task, idType):
     if f"{idType}_id" not in task:
-        raise Exception(f"No {idType} ID in Task")
+        return False
 
 
 def main():

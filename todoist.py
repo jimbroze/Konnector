@@ -51,7 +51,7 @@ class Todoist:
     projects = {
         "inbox": "2200213434",
         "alexa": "2231741057",
-        'food_log': "2291635541",
+        "food_log": "2291635541",
         "next_actions": "2284385839",
     }
     # projectEvents = {
@@ -102,18 +102,21 @@ class Todoist:
         ).decode("utf-8")
         if request.headers["X-Todoist-Hmac-SHA256"] != calcHmac:
             raise Exception("Bad HMAC")
+        logger.debug(f"Headers check OK.")
 
         data = request.get_json(force=True)
-        logger.debug(f"Headers check OK. Request data: {data}")
+        logger.debug(f"Request data: {data}")
+
         if str(data["user_id"]) != self.userId:
             raise Exception("Invalid User")
+
         event = self._check_event(data["event_name"])
         project = self._check_project(data["event_data"]["project_id"])
+
         return {"data": data, "event": event, "list": project}
 
     def _check_project(self, projectId):
         projectId = str(projectId)
-
         if projectId not in self.projects.values():
             raise Exception(f"Invalid Todoist project: {projectId}")
         projectName = [
@@ -154,6 +157,7 @@ class Todoist:
         else:
             task["description"] = data["event_data"]["description"]
         if "due" in data["event_data"] and data["event_data"]["due"] is not None:
+            # TODO is time stored separately???
             task["due_date"], task["due_time"] = convert_time(
                 data["event_data"]["due"]["date"]
             )

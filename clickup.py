@@ -90,8 +90,7 @@ class Clickup:
         - data: Received data
         - event: Clickup event
         """
-        logger.info(f"Clickup request received:")
-        logger.debug(f"request: {request.get_data()}")
+        logger.info(f"Clickup request received. Checking headers.")
         calcHmac = hmac.new(
             bytes(self.webhookSecret, "utf-8"),
             msg=request.get_data(),
@@ -99,20 +98,22 @@ class Clickup:
         ).hexdigest()
         if request.headers["X-Signature"] != calcHmac:
             raise Exception("Bad HMAC")
+        logger.debug(f"Headers check OK.")
         data = request.get_json(force=True)
-        logger.debug(data)
+        logger.debug(f"Request data: {data}")
 
         userId = data["history_items"][0]["user"]["id"]
         listId = data["history_items"][0]["parent_id"]
-        event = data["event"]
 
         if str(userId) not in self.userId:
             raise Exception(f"Unrecognised User: {userId}")
-        if event not in self.clickupEvents:
-            raise Exception(f"Unrecognised Clickup event: {event}")
 
-        if listId not in self.lists.values():
-            raise Exception(f"Unrecognised Clickup List: {listId}")
+        event = self._check_event(data["event"])
+        list = self._check_list(listId)
+
+        # Set update flag if task has been updated
+        update = True if event == "task_updated" else False
+
         if event in ["taskStatusUpdated"]:
             clickupStatus = data["history_items"][0]["after"]["status"]
             if clickupStatus in self.listStatuses[listId]:
@@ -120,11 +121,22 @@ class Clickup:
             else:
                 raise Exception(f"Unrecognised status update: {clickupStatus}")
 
-        logger.info(f"Clickup request ok. Event is {event}")
-        return {
-            "data": data,
-            "event": self.events[event],
-        }
+        return {"data": data, "event": event, "list": list, "update": update}
+
+    def _check_list(self, listId):
+        listId = str(listId)
+        if listId not in self.lists.values():
+            raise Exception(f"Invalid Clickup List: {listId}")
+        listName = [key for key, value in self.lists.items() if value == listId][0]
+        logger.debug(f"Clickup list: {listName}")
+        return listName
+
+    def _check_event(self, clickupEvent):
+        if clickupEvent not in self.events:
+            raise Exception(f"Invalid Clickup event: {clickupEvent}")
+        normalisedEvent = self.events[clickupEvent]
+        logger.debug(f"Clickup event: {normalisedEvent}")
+        return normalisedEvent
 
     def _send_request(self, location, reqType="GET", data={}):
         return helpers.send_request(
@@ -235,8 +247,9 @@ class Clickup:
         response = self._send_request(f"task/{taskId}", "PUT", clickupTask)
         return response
 
-    def check_if_subtask(self, task):
+    def is_subtask(self, task):
         try:
             task["parent"]
+            return False
         except KeyError:
-            raise Exception("Clickup task is subtask.")
+            return True
