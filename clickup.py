@@ -178,8 +178,8 @@ class Clickup:
                 if "custom_id" in clickupTask and clickupTask["custom_id"] is not None
                 else clickupTask["id"]
             ),
-            "status": clickupTask["status"]["status"]
-            ** self._normalize_task(clickupTask),
+            "status": clickupTask["status"]["status"],
+            **self._normalize_task(clickupTask),
         }
         # Include updated data separately
         if "history_items" in data:

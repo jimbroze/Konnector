@@ -147,7 +147,10 @@ def move_task(input, output, deleteTask=False):
     logger.info(
         f"Attempting to add new task from {inPlatformName}-{input['list']} to {outPlatformName}-{output['list']}"
     )
-    outputTask = output["platform"].create_task(input["task"], output["list"])
+    modifiedInTask = {**input["task"]}
+    if deleteTask == True:
+        modifiedInTask.pop(f"{inPlatformName}_id", None)
+    outputTask = output["platform"].create_task(modifiedInTask, output["list"])
     logger.info(f"Successfully added new task to {outPlatformName}.")
     if deleteTask == True:
         logger.info(f"Attempting to delete new task from {inPlatformName}")
