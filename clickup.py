@@ -146,37 +146,44 @@ class Clickup:
             data,
         )
 
-    def task_received(self, data, update=False):
-        # Get task
-        taskId = data["task_id"]
-        response = self._send_request("task/" + str(taskId))
-        if update == True:
-            clickupTask = {"custom_fields": response["custom_fields"]}
-            for updatedField in data["history_items"]:
-                clickupTask[updatedField["field"]] = updatedField["after"]
-        else:
-            clickupTask = response
+    def _normalize_task(self, clickupTask):
+        outTask = {
+            "clickup_id": (
+                clickupTask["custom_id"]
+                if "custom_id" in clickupTask and clickupTask["custom_id"] is not None
+                else clickupTask["id"]
+            )
+        }
+        outTask = {"clickup_id": clickupTask["id"]}
 
-        task = {"clickup_id": taskId}
         if "name" in clickupTask:
-            task["name"] = clickupTask["name"]
+            outTask["name"] = clickupTask["name"]
         if "description" in clickupTask:
-            task["description"] = clickupTask["description"]
+            outTask["description"] = clickupTask["description"]
         if "due_date" in clickupTask and clickupTask["due_date"] != "None":
-            task["due_date"] = clickupTask["due_date"]
+            outTask["due_date"] = clickupTask["due_date"]
         if "priority" in clickupTask and clickupTask["priority"] != "None":
             # Priority is reversed (When 4 becomes ooooooooone)
-            task["priority"] = clickupTask["priority"]
+            outTask["priority"] = clickupTask["priority"]
         if "clickup_complete" in clickupTask:
-            task["clickup_complete"] = (
+            outTask["clickup_complete"] = (
                 True if clickupTask["status"] == "complete" else False
             )
         for customField in clickupTask["custom_fields"]:
             if customField["id"] == self.customFieldTodoist and "value" in customField:
-                task["todoist_id"] = customField["value"]
+                outTask["todoist_id"] = customField["value"]
 
-        logger.debug(f"Clickup task: {task}")
-        return task
+    def get_task(self, data):
+        clickupTask = self._send_request("task/" + str(data["task_id"]))
+        outTask = self._normalize_task(clickupTask)
+        # Include updated data separately
+        if "history_items" in data:
+            clickupTaskUpdates = {}
+            for updatedField in data["history_items"]:
+                clickupTaskUpdates[updatedField["field"]] = updatedField["after"]
+            outTask["updates"] = self._normalize_task(clickupTaskUpdates)
+        logger.debug(f"Clickup Task: {outTask}")
+        return outTask
 
     def _convert_task_to(self, task, new=False):
         clickupTask = {}
@@ -243,7 +250,8 @@ class Clickup:
         response = self._send_request(f"task/{str(taskId)}")
         if response["status"] == "complete":
             raise Exception("Clickup task already complete")
-        clickupTask = self._convert_task_to(task)
+        taskUpdates = task["updates"] if "updates" in task else task
+        clickupTask = self._convert_task_to(taskUpdates)
         response = self._send_request(f"task/{taskId}", "PUT", clickupTask)
         return response
 

@@ -143,37 +143,39 @@ class Todoist:
             data,
         )
 
-    def task_received(self, data):
-        task = {
-            "todoist_id": data["event_data"]["id"],
-            "name": data["event_data"]["content"],
-            "todoist_project": data["event_data"]["project_id"],
+    def _normalize_task(self, todoistTask):
+        outTask = {
+            "todoist_id": todoistTask["id"],
+            "name": todoistTask["content"],
+            "todoist_project": todoistTask["project_id"],
+            "todoist_complete": (True if todoistTask["checked"] == 1 else False),
         }
         if (
-            str(task["todoist_project"]) == str(self.projects["next_actions"])
-            and data["event_data"]["description"] is not None
+            str(outTask["todoist_project"]) == str(self.projects["next_actions"])
+            and todoistTask["description"] is not None
         ):
-            task["clickup_id"] = data["event_data"]["description"]
+            outTask["clickup_id"] = todoistTask["description"]
         else:
-            task["description"] = data["event_data"]["description"]
-        if "due" in data["event_data"] and data["event_data"]["due"] is not None:
+            outTask["description"] = todoistTask["description"]
+        if "due" in todoistTask and todoistTask["due"] is not None:
             # TODO is time stored separately???
-            task["due_date"], task["due_time"] = convert_time(
-                data["event_data"]["due"]["date"]
+            outTask["due_date"], outTask["due_time"] = convert_time(
+                todoistTask["due"]["date"]
             )
-        if data["event_data"]["priority"] > 1:
+        if todoistTask["priority"] > 1:
             # Priority is reversed (4 is actually 1)
-            task["priority"] = 5 - data["event_data"]["priority"]
-        task["todoist_complete"] = True if data["event_data"]["checked"] == 1 else False
+            outTask["priority"] = 5 - todoistTask["priority"]
 
-        logger.debug(f"Normalized Todoist task: {task}")
-        return task
+    def get_task(self, data):
+        outTask = self._normalize_task(data["event_data"])
+        logger.debug(f"Normalized Todoist task: {outTask}")
+        return outTask
 
     def _convert_task(self, task, project=""):
         todoistTask = {}
         if "name" in task:
             todoistTask["content"] = task["name"]
-        if "description" in task:
+        if "clickup_id" in task:
             todoistTask["description"] = task["clickup_id"]
             # Change if non-clickup tasks are added.
         if "due_date" in task:
@@ -215,8 +217,8 @@ class Todoist:
                 raise Exception
         except Exception:
             raise Exception("Todoist task already complete")
-
-        todoistTask = self._convert_task(task)
+        taskUpdates = task["updates"] if "updates" in task else task
+        todoistTask = self._convert_task(taskUpdates)
         if todoistTask == {}:
             raise Exception("Nothing to update in Todoist Task.")
         response = self._send_request(f"/tasks/{taskId}", "POST", todoistTask)
