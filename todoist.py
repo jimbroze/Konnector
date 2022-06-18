@@ -190,10 +190,11 @@ class Todoist:
     def create_task(self, task, project):
         projectId = self.projects[project]
         # Check if ID already exists
-        projectTasks = self._send_request(f"/tasks?project_id={projectId}", "GET")
-        for projectTask in projectTasks:
-            if str(projectTask["description"]) == str(task["clickup_id"]):
-                raise Exception("Clickup ID already exists in Todoist project.")
+        if "clickup_id" in task:
+            projectTasks = self._send_request(f"/tasks?project_id={projectId}", "GET")
+            for projectTask in projectTasks:
+                if str(projectTask["description"]) == str(task["clickup_id"]):
+                    raise Exception("Clickup ID already exists in Todoist project.")
 
         todoistTask = self._convert_task(task, projectId)
         response = self._send_request("/tasks", "POST", todoistTask)
@@ -213,12 +214,10 @@ class Todoist:
 
     def update_task(self, task):
         taskId = task["todoist_id"]
-        try:
-            response = self._send_request(f"/tasks/{taskId}")
-            if response["completed"] == True:
-                raise Exception
-        except Exception:
-            raise Exception("Todoist task already complete")
+        response = self._send_request(f"/tasks/{taskId}")
+        if response["completed"] == True:
+            logging.warning("Todoist task already complete")
+            return False
         taskUpdates = task["updates"] if "updates" in task else task
         todoistTask = self._convert_task(taskUpdates)
         if todoistTask == {}:

@@ -215,18 +215,19 @@ class Clickup:
     def create_task(self, task, list):
         listId = self.lists[list]
         # Check for existing ID
-        queryParams = (
-            'custom_fields=[{"field_id":"'
-            + self.customFieldTodoist
-            + '","operator":"=","value":'
-            + str(task["todoist_id"])
-            + "}]"
-        )
-        projectTasks = self._send_request(
-            f"list/{listId}/task?{queryParams}", "GET", {}
-        )
-        if not projectTasks:
-            raise Exception("Todoist ID already exists in Clickup list.")
+        if "todoist_id" in task:
+            queryParams = (
+                'custom_fields=[{"field_id":"'
+                + self.customFieldTodoist
+                + '","operator":"=","value":'
+                + str(task["todoist_id"])
+                + "}]"
+            )
+            projectTasks = self._send_request(
+                f"list/{listId}/task?{queryParams}", "GET", {}
+            )
+            if not projectTasks:
+                raise Exception("Todoist ID already exists in Clickup list.")
 
         clickupTask = self._convert_task_to(task, new=True)
         response = self._send_request(f"list/{str(listId)}/task", "POST", clickupTask)

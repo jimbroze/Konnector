@@ -112,29 +112,44 @@ def clickup_webhook_received():
             "task": clickupTask,
         }
         outputData = {"platform": todoist}
-        # Update Clickup task in Todoist
-        if clickupRequest["event"] in ["task_complete", "task_updated", "task_removed"]:
-            # Returns False if no task in Todoist
-            todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
+
         # Clickup task into todoist next_actions:
         if clickupRequest["event"] in ["task_updated"]:
-            outputData["list"] = "next_actions"
             # Check if valid for next actions
             # Next action status and (high priority, due date < 1 week, no project.)
-            if clickupTask["status"] == "next action" and (
-                clickupTask["priority"] < 3
-                or max_days_diff(clickupTask["due_date"], days=3)
-                or not clickup.is_subtask(clickupTask)
+            if (
+                clickupRequest["event"] in ["task_updated"]
+                and clickupTask["status"] == "next action"
+                and (
+                    clickupTask["priority"] < 3
+                    or max_days_diff(clickupTask["due_date"], days=3)
+                    or not clickup.is_subtask(clickupTask)
+                )
             ):
+                outputData["list"] = "next_actions"
                 if todoistTask == False:
                     logger.info(f"Adding task to next actions list.")
                     todoistTask = move_task(inputData, outputData, deleteTask=False)
                     clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
                 else:
                     logger.info(f"Task is already in next actions list.")
-            elif todoistTask != False and todoistTask["list"] == "next_actions":
+            elif (
+                clickupRequest["event"] in ["task_updated"]
+                and todoistTask != False
+                and todoistTask["list"] == "next_actions"
+            ):
                 logger.info(f"Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
+            # Update Clickup task in Todoist
+            elif clickupRequest["event"] in [
+                "task_complete",
+                "task_updated",
+                "task_removed",
+            ]:
+                # Returns False if no task in Todoist
+                todoistTask = modify_task(
+                    inputData, outputData, clickupRequest["event"]
+                )
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing clickup webhook: {e}")
@@ -147,10 +162,7 @@ def move_task(input, output, deleteTask=False):
     logger.info(
         f"Attempting to add new task from {inPlatformName}-{input['list']} to {outPlatformName}-{output['list']}"
     )
-    modifiedInTask = {**input["task"]}
-    if deleteTask == True:
-        modifiedInTask.pop(f"{inPlatformName}_id", None)
-    outputTask = output["platform"].create_task(modifiedInTask, output["list"])
+    outputTask = output["platform"].create_task(input["task"], output["list"])
     logger.info(f"Successfully added new task to {outPlatformName}.")
     if deleteTask == True:
         logger.info(f"Attempting to delete new task from {inPlatformName}")
@@ -174,6 +186,8 @@ def modify_task(input, output, event):
         "task_updated": output["platform"].update_task,
         "task_removed": output["platform"].delete_task,
     }[event](input["task"])
+    if outputTask == False:
+        return False
     logger.info(
         f"Successfully completed event: '{event}' from {inPlatformName} task to {outPlatformName} task"
     )
