@@ -178,7 +178,8 @@ class Clickup:
                 if "custom_id" in clickupTask and clickupTask["custom_id"] is not None
                 else clickupTask["id"]
             ),
-            **self._normalize_task(clickupTask),
+            "status": clickupTask["status"]["status"]
+            ** self._normalize_task(clickupTask),
         }
         # Include updated data separately
         if "history_items" in data:
@@ -233,11 +234,15 @@ class Clickup:
 
     def add_todoist_id(self, task, id):
         fieldUpdate = {"value": str(id)}
-        response = self._send_request(
-            f"task/{str(task['clickup_id'])}/field/{self.customFieldTodoist}",
-            "POST",
-            fieldUpdate,
-        )
+        try:
+            response = self._send_request(
+                f"task/{str(task['clickup_id'])}/field/{self.customFieldTodoist}",
+                "POST",
+                fieldUpdate,
+            )
+        except:
+            raise Exception("Error adding Todoist Id to Clickup task.")
+
         return response
 
     def complete_task(self, todoistTask):

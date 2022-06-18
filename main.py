@@ -120,16 +120,16 @@ def clickup_webhook_received():
         if clickupRequest["event"] in ["task_updated"]:
             outputData["list"] = "next_actions"
             # Check if valid for next actions
-            # (high priority, due date < 1 week, no project.)
-            if (
+            # Next action status and (high priority, due date < 1 week, no project.)
+            if clickupTask["status"] == "next action" and (
                 clickupTask["priority"] < 3
                 or max_days_diff(clickupTask["due_date"], days=3)
                 or not clickup.is_subtask(clickupTask)
             ):
-                logger.info(f"Task is valid for next actions list.")
                 if todoistTask == False:
                     logger.info(f"Adding task to next actions list.")
                     todoistTask = move_task(inputData, outputData, deleteTask=False)
+                    clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
                 else:
                     logger.info(f"Task is already in next actions list.")
             elif todoistTask != False and todoistTask["list"] == "next_actions":
@@ -180,6 +180,7 @@ def modify_task(input, output, event):
 def checkId(task, idType):
     if f"{idType}_id" not in task:
         return False
+    return True
 
 
 def main():
