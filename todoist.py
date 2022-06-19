@@ -169,10 +169,12 @@ class Todoist:
         else:
             outTask["description"] = todoistTask["description"]
         if "due" in todoistTask and todoistTask["due"] is not None:
-            # TODO is time stored separately???
-            outTask["due_date"], outTask["due_time"] = convert_time(
+            # TODO is time stored separately??? Save as Epoch
+            outTask["due_date"], outTask["due_time_included"] = convert_time(
                 todoistTask["due"]["date"]
             )
+        else:
+            outTask["due_date"] = None
         return outTask
 
     # TODO rename method?

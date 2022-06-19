@@ -20,12 +20,12 @@ clickup = Clickup(clickupEndpoint)
 
 def max_days_diff(dateIn, days):
     cutoff = time.time() + days * 86400
-    if int(dateIn) < cutoff:
-        logging.debug("Date is before cutoff")
-        return True
-    else:
+    if dateIn is None or int(dateIn) > cutoff:
         logging.debug("Date is not before cutoff")
         return False
+    else:
+        logging.debug("Date is before cutoff")
+        return True
 
 
 @app.route("/")

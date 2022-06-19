@@ -156,6 +156,8 @@ class Clickup:
             outTask["description"] = clickupTask["description"]
         if "due_date" in clickupTask and clickupTask["due_date"] is not None:
             outTask["due_date"] = clickupTask["due_date"]
+        else:
+            outTask["due_date"] = None
         if "priority" in clickupTask and clickupTask["priority"] is not None:
             outTask["priority"] = int(clickupTask["priority"]["id"])
         else:
@@ -201,9 +203,9 @@ class Clickup:
             clickupTask["name"] = task["name"]
         if "description" in task:
             clickupTask["description"] = task["description"]
-        if "due_date" in task:
+        if "due_date" in task and clickupTask["due_date"] is not None:
             clickupTask["due_date"] = task["due_date"]
-            clickupTask["due_date_time"] = task["due_time"]
+            clickupTask["due_date_time"] = task["due_time_included"]
         if "priority" in task:
             clickupTask["priority"] = task["priority"]
         if new == True:
