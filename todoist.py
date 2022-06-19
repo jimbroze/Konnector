@@ -149,6 +149,7 @@ class Todoist:
 
         if "priority" in todoistTask and todoistTask["priority"] == 1:
             todoistTask["priority"] = 2
+        return todoistTask
 
     def _normalize_task(self, todoistTask):
         outTask = {
@@ -158,7 +159,7 @@ class Todoist:
             "todoist_complete": (True if todoistTask["checked"] == 1 else False),
             # Priority is reversed (When 4 becomes ooooooooone)
             # in Todoist, 4 is highest.
-            outTask["priority"]: 5 - todoistTask["priority"],
+            "priority": 5 - todoistTask["priority"],
         }
         if (
             str(outTask["todoist_project"]) == str(self.projects["next_actions"])

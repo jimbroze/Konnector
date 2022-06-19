@@ -274,8 +274,9 @@ class Clickup:
         return response
 
     def is_subtask(self, task):
-        try:
-            task["parent"]
-            return False
-        except KeyError:
+        if "parent" in task and task["parent"] is not None:
+            logging.debug("Task is a Clickup subtask")
             return True
+        else:
+            logging.debug("Not a Clickup subtask")
+            return False
