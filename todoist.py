@@ -29,12 +29,26 @@ def convert_time(s):
     return epochTime, timeIncluded
 
 
-def convert_time_to(epochTime):
-    # RFC3339
-    format = "%Y-%m-%dT%H:%M:%S"
-    dt = datetime.datetime.fromtimestamp(int(epochTime))
+def convert_time_to(epochTime, timeIncluded=None):
+    # /1000 to get seconds
+    dt = datetime.datetime.fromtimestamp(int(epochTime) / 1000)
+    dt = dt.replace(tzinfo=tz.gettz("UTC"))
+    dt = dt.astimezone(tz.gettz("Europe/London"))
+
+    # TODO change to use different due date key
+    if timeIncluded == False or (
+        timeIncluded == None and dt.hour == 4 and dt.minute == 0
+    ):
+        # Remove time.
+        timeIncluded = False
+        dt = dt.date()
+        format = "%Y-%m-%d"
+    else:
+        timeIncluded = True
+        format = "%Y-%m-%dT%H:%M:%S"  # RFC3339
+
     formattedDt = datetime.datetime.strftime(dt, format)
-    return formattedDt
+    return formattedDt, timeIncluded
 
 
 class Todoist:
@@ -205,7 +219,15 @@ class Todoist:
             todoistTask["description"] = task["clickup_id"]
             # Change if non-clickup tasks are added.
         if "due_date" in task and task["due_date"] is not None:
-            todoistTask["due_datetime"] = convert_time_to(task["due_date"])
+            due_time_included = (
+                task["due_time_included"] if "due_time_included" in task else None
+            )
+            dt, due_time_included = convert_time_to(task["due_date"], due_time_included)
+            if due_time_included:
+                todoistTask["due_datetime"] = dt
+            else:
+                todoistTask["due_date"] = dt
+
         if projectId != "":
             todoistTask["project_id"] = projectId
         if "priority" in task:

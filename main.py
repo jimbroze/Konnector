@@ -107,7 +107,7 @@ def todoist_webhook():
         return make_response(repr(e), 202)
 
 
-# Clickup webhook.
+# Clickup webhook
 @app.route(clickupEndpointQuery, methods=["POST"])
 def clickup_webhook_received():
     try:

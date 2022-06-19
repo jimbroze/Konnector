@@ -112,9 +112,6 @@ class Clickup:
         event = self._check_event(data["event"])
         list = self._check_list(listId)
 
-        # Set update flag if task has been updated
-        update = True if event == "task_updated" else False
-
         if event in ["taskStatusUpdated"]:
             clickupStatus = data["history_items"][0]["after"]["status"]
             if clickupStatus in self.listStatuses[listId]:
@@ -122,7 +119,7 @@ class Clickup:
             else:
                 raise Exception(f"Unrecognised status update: {clickupStatus}")
 
-        return {"data": data, "event": event, "list": list, "update": update}
+        return {"data": data, "event": event, "list": list}
 
     def _check_list(self, listId):
         listId = str(listId)
@@ -154,15 +151,22 @@ class Clickup:
             outTask["name"] = clickupTask["name"]
         if "description" in clickupTask:
             outTask["description"] = clickupTask["description"]
+
         if "due_date" in clickupTask and clickupTask["due_date"] is not None:
             outTask["due_date"] = clickupTask["due_date"]
         else:
             outTask["due_date"] = None
+
+        # Isn't currently provided from get_task api call but included for updates
+        if "due_date_time" in clickupTask:
+            outTask["due_time_included"] = clickupTask["due_date_time"]
+
         if "priority" in clickupTask and clickupTask["priority"] is not None:
             outTask["priority"] = int(clickupTask["priority"]["id"])
         else:
             # Set priority to normal (3) if none.
             outTask["priority"] = 3
+
         if "clickup_complete" in clickupTask:
             outTask["clickup_complete"] = (
                 True if clickupTask["status"] == "complete" else False
@@ -193,6 +197,15 @@ class Clickup:
             clickupTaskUpdates = {}
             for updatedField in data["history_items"]:
                 clickupTaskUpdates[updatedField["field"]] = updatedField["after"]
+                # Clickup only provides time included bool with update data.
+                if (
+                    updatedField["field"] == "due_date"
+                    and "due_date_time" in updatedField["data"]
+                ):
+                    clickupTaskUpdates["due_date_time"] = updatedField["data"][
+                        "due_date_time"
+                    ]
+                    outTask["due_time_included"] = updatedField["data"]["due_date_time"]
             outTask["updates"] = self._normalize_task(clickupTaskUpdates)
         logger.debug(f"Clickup Task: {outTask}")
         return outTask
