@@ -29,6 +29,14 @@ def convert_time(s):
     return epochTime, timeIncluded
 
 
+def convert_time_to(epochTime):
+    # RFC3339
+    format = "%Y-%m-%dT%H:%M:%S"
+    dt = datetime.datetime.fromtimestamp(int(epochTime))
+    formattedDt = datetime.datetime.strftime(dt, format)
+    return formattedDt
+
+
 class Todoist:
     name = "todoist"
     clientId = os.environ["TODOIST_CLIENT_ID"]
@@ -197,7 +205,7 @@ class Todoist:
             todoistTask["description"] = task["clickup_id"]
             # Change if non-clickup tasks are added.
         if "due_date" in task and task["due_date"] is not None:
-            todoistTask["date_string"] = task["due_date"]
+            todoistTask["due_datetime"] = convert_time_to(task["due_date"])
         if projectId != "":
             todoistTask["project_id"] = projectId
         if "priority" in task:
