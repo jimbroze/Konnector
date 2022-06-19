@@ -17,11 +17,11 @@ todoist = Todoist()
 clickupEndpoint = ENDPOINT + clickupEndpointQuery
 clickup = Clickup(clickupEndpoint)
 
-
+# FIXME not working?
 def max_days_diff(dateIn, days):
     cutoff = time.time() + days * 86400
     if dateIn is None or int(dateIn) > cutoff:
-        logging.debug("Date is not before cutoff")
+        logging.debug("Date is after cutoff")
         return False
     else:
         logging.debug("Date is before cutoff")

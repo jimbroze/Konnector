@@ -144,6 +144,12 @@ class Clickup:
             data,
         )
 
+    def _normalize_priority(self, task):
+        """Sets the priority to 3 if none exists"""
+        if "priority" not in task:
+            task["priority"] = 3
+        return task
+
     def _normalize_task(self, clickupTask):
         logging.debug("Normalizing clickup task")
         outTask = {}
@@ -161,11 +167,12 @@ class Clickup:
         if "due_date_time" in clickupTask:
             outTask["due_time_included"] = clickupTask["due_date_time"]
 
-        if "priority" in clickupTask and clickupTask["priority"] is not None:
+        if (
+            "priority" in clickupTask
+            and clickupTask["priority"] is not None
+            and "id" in clickupTask["priority"]
+        ):
             outTask["priority"] = int(clickupTask["priority"]["id"])
-        else:
-            # Set priority to normal (3) if none.
-            outTask["priority"] = 3
 
         if "clickup_complete" in clickupTask:
             outTask["clickup_complete"] = (
@@ -192,6 +199,8 @@ class Clickup:
             "status": clickupTask["status"]["status"],
             **self._normalize_task(clickupTask),
         }
+        if "priority" not in outTask:
+            outTask = self._normalize_priority(outTask)
         # Include updated data separately
         if "history_items" in data:
             clickupTaskUpdates = {}

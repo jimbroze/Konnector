@@ -12,7 +12,7 @@ import helpers
 logger = logging.getLogger(__name__)
 
 
-def convert_time(s):
+def convert_time_from(s):
     if "T" in s:
         format = "%Y-%m-%dT%H:%M:%S"
         timeIncluded = True
@@ -192,7 +192,7 @@ class Todoist:
             outTask["description"] = todoistTask["description"]
         if "due" in todoistTask and todoistTask["due"] is not None:
             # TODO is time stored separately??? Save as Epoch
-            outTask["due_date"], outTask["due_time_included"] = convert_time(
+            outTask["due_date"], outTask["due_time_included"] = convert_time_from(
                 todoistTask["due"]["date"]
             )
         else:
@@ -276,6 +276,8 @@ class Todoist:
         if response["completed"] == True:
             logging.debug("Todoist task already complete")
             return False
+        logging.debug("Todoist task exists.")
+        return True
 
     def update_task(self, task):
         taskId = task["todoist_id"]
