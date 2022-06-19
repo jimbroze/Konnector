@@ -143,12 +143,22 @@ class Todoist:
             data,
         )
 
+    def _normalize_priority(self, todoistTask):
+        """Sets the priority of new tasks to 2 so that 1 is lower than "normal".
+        Prority from 1 to 4 will then be reversed during task normalization."""
+
+        if "priority" in todoistTask and todoistTask["priority"] == 1:
+            todoistTask["priority"] = 2
+
     def _normalize_task(self, todoistTask):
         outTask = {
             "todoist_id": todoistTask["id"],
             "name": todoistTask["content"],
             "todoist_project": todoistTask["project_id"],
             "todoist_complete": (True if todoistTask["checked"] == 1 else False),
+            # Priority is reversed (When 4 becomes ooooooooone)
+            # in Todoist, 4 is highest.
+            outTask["priority"]: 5 - todoistTask["priority"],
         }
         if (
             str(outTask["todoist_project"]) == str(self.projects["next_actions"])
@@ -162,15 +172,17 @@ class Todoist:
             outTask["due_date"], outTask["due_time"] = convert_time(
                 todoistTask["due"]["date"]
             )
-        if todoistTask["priority"] > 1:
-            # Priority is reversed (When 4 becomes ooooooooone)
-            # in Todoist, 4 is highest.
-            outTask["priority"] = 5 - todoistTask["priority"]
         return outTask
 
     # TODO rename method?
-    def get_task(self, data):
-        outTask = self._normalize_task(data["event_data"])
+    def get_task(self, request):
+        data = request["data"]
+        task = (
+            self._normalize_priority(data["event_data"])
+            if request["event"] == "new_task"
+            else data["event_data"]
+        )
+        outTask = self._normalize_task(task)
         logger.debug(f"Normalized Todoist task: {outTask}")
         return outTask
 
@@ -216,6 +228,7 @@ class Todoist:
         return response
 
     def check_if_task_exists(self, task):
+        logging.info("checking if Todoist task exists")
         if "todoist_id" not in task:
             logging.debug("No todoist Id.")
             return False

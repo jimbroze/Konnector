@@ -73,7 +73,7 @@ elif AUTH == "clickup":
 def todoist_webhook():
     try:
         todoistRequest = todoist.check_request(request)
-        todoistTask = todoist.get_task(todoistRequest["data"])
+        todoistTask = todoist.get_task(todoistRequest)
         inputData = {
             "platform": todoist,
             "list": todoistRequest["list"],

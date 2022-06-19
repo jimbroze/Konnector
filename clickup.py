@@ -27,7 +27,8 @@ class Clickup:
     # webhookId = None
     webhookId = os.environ["CLICKUP_WEBHOOK_ID"]
     webhookSecret = os.environ["CLICKUP_WEBHOOK_SECRET"]
-    userId = ["2511898", 0]
+    # -1 is Clickbot
+    userId = ["2511898", 0, -1]
     customFieldTodoist = "550a93a0-6978-4664-be6d-777cc0d7aff6"
 
     def __init__(self, endpoint):
@@ -147,15 +148,19 @@ class Clickup:
         )
 
     def _normalize_task(self, clickupTask):
+        logging.debug("Normalizing clickup task")
         outTask = {}
         if "name" in clickupTask:
             outTask["name"] = clickupTask["name"]
         if "description" in clickupTask:
             outTask["description"] = clickupTask["description"]
-        if "due_date" in clickupTask and clickupTask["due_date"] != "None":
+        if "due_date" in clickupTask and clickupTask["due_date"] is not None:
             outTask["due_date"] = clickupTask["due_date"]
-        if "priority" in clickupTask and clickupTask["priority"] != "None":
+        if "priority" in clickupTask and clickupTask["priority"] is not None:
             outTask["priority"] = int(clickupTask["priority"]["id"])
+        else:
+            # Set priority to normal (3) if none.
+            outTask["priority"] = 3
         if "clickup_complete" in clickupTask:
             outTask["clickup_complete"] = (
                 True if clickupTask["status"] == "complete" else False
