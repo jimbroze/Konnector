@@ -31,10 +31,12 @@ def max_days_diff(dateIn, days):
 
 @app.route("/")
 def home():
-    return ("<ul>"
-            "<li><a href='todoist/auth'>Todoist Auth</a></li>"
-            "<li><a href='clickup/webhook/add'>Add Clickup webhook</a></li>"
-            "</ul>")
+    return (
+        "<ul>"
+        "<li><a href='todoist/auth'>Todoist Auth</a></li>"
+        "<li><a href='clickup/webhook/add'>Add Clickup webhook</a></li>"
+        "</ul>"
+    )
 
 
 # @app.route('/auth/init/<appname>')
@@ -96,12 +98,11 @@ def todoist_webhook():
                 )
             clickupTask = move_task(inputData, outputData, deleteTask=True)
         elif todoistRequest["event"] in [
-                "task_complete",
-                "task_updated",
-                "task_removed",
+            "task_complete",
+            "task_updated",
+            "task_removed",
         ]:
-            clickupTask = modify_task(inputData, outputData,
-                                      todoistRequest["event"])
+            clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing Todoist webhook: {e}")
@@ -120,23 +121,21 @@ def clickup_webhook_received():
             "task": clickupTask,
         }
         outputData = {"platform": todoist}
-        todoistTaskExists = todoist.check_if_task_exists(clickupTask)
+        todoistTaskExists, todoistTask = todoist.check_if_task_exists(clickupTask)
 
         if clickupRequest["event"] in ["task_updated"]:
             # Clickup task into todoist next_actions.
             # Next action status and (high priority, due date < 1 week, no project.)
             if clickupTask["status"] == "next action" and (
-                    clickupTask["priority"] < 3
-                    or max_days_diff(clickupTask["due_date"], days=3)
-                    or not clickup.is_subtask(clickupTask)):
+                clickupTask["priority"] < 3
+                or max_days_diff(clickupTask["due_date"], days=3)
+                or not clickup.is_subtask(clickupTask)
+            ):
                 outputData["list"] = "next_actions"
                 if not todoistTaskExists:
                     logger.info(f"Adding task to next actions list.")
-                    todoistTask = move_task(inputData,
-                                            outputData,
-                                            deleteTask=False)
-                    clickup.add_todoist_id(clickupTask,
-                                           todoistTask["todoist_id"])
+                    todoistTask = move_task(inputData, outputData, deleteTask=False)
+                    clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
                 else:
                     logger.info(f"Task is already in next actions list.")
             elif todoistTaskExists and todoistTask["list"] == "next_actions":
@@ -144,17 +143,21 @@ def clickup_webhook_received():
                 todoist.delete_task(clickupTask)
 
             else:
-                todoistTask = modify_task(inputData, outputData,
-                                          clickupRequest["event"])
+                todoistTask = modify_task(
+                    inputData, outputData, clickupRequest["event"]
+                )
 
         # Update Clickup task in Todoist
-        elif (clickupRequest["event"] in [
+        elif (
+            clickupRequest["event"]
+            in [
                 "task_complete",
                 "task_removed",
-        ] and todoistTaskExists):
+            ]
+            and todoistTaskExists
+        ):
             # TODO complete task if status set to complete.
-            todoistTask = modify_task(inputData, outputData,
-                                      clickupRequest["event"])
+            todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing clickup webhook: {e}")

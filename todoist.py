@@ -260,28 +260,30 @@ class Todoist:
         response = self._send_request(f"/tasks/{taskId}/close", "POST")
         return response
 
+    # TODO rename? Now returns task as well.
     def check_if_task_exists(self, task):
         logging.info("checking if Todoist task exists")
         if "todoist_id" not in task:
             logging.debug("No todoist Id.")
-            return False
+            return False, {}
         try:
             response = self._send_request(f"/tasks/{task['todoist_id']}")
         except:
             logging.debug("Error retrieving task.")
-            return False
+            return False, {}
         if response is None or response == {} or response == "":
             logging.debug("No task found.")
-            return False
+            return False, {}
+        todoistTask = self._normalize_task(response)
         if response["completed"] == True:
             logging.debug("Todoist task already complete")
-            return False
+            return False, todoistTask
         logging.debug("Todoist task exists.")
-        return True
+        return True, todoistTask
 
     def update_task(self, task):
         taskId = task["todoist_id"]
-        if not self.check_if_task_exists(task):
+        if not self.check_if_task_exists(task)[0]:
             return False
         taskUpdates = task["updates"] if "updates" in task else task
         todoistTask = self._convert_task(taskUpdates)
