@@ -281,7 +281,7 @@ class Todoist:
 
     def update_task(self, task):
         taskId = task["todoist_id"]
-        if self.check_if_task_exists(task):
+        if not self.check_if_task_exists(task):
             return False
         taskUpdates = task["updates"] if "updates" in task else task
         todoistTask = self._convert_task(taskUpdates)
