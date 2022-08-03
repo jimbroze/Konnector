@@ -178,7 +178,12 @@ class Todoist:
             "todoist_id": todoistTask["id"],
             "name": todoistTask["content"],
             "todoist_project": todoistTask["project_id"],
-            "todoist_complete": (True if todoistTask["checked"] == 1 else False),
+            "todoist_complete": (
+                True
+                if ("checked" in todoistTask and todoistTask["checked"] == 1)
+                or ("completed" in todoistTask and todoistTask["completed"] == True)
+                else False
+            ),
             # Priority is reversed (When 4 becomes ooooooooone)
             # in Todoist, 4 is highest.
             "priority": 5 - todoistTask["priority"],
