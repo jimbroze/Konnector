@@ -36,8 +36,10 @@ class Clickup:
         """"""
         self.endpoint = endpoint
 
-    def modify_webhook(self, request):
+    def modify_webhook(self, request, delete=False):
         """Create or update the clickup webhook"""
+        if delete:
+            return self._delete_webhook(self.webhookId)
         if self.webhookId is not None:
             return self._update_webhook(
                 self.webhookId,
@@ -84,6 +86,12 @@ class Clickup:
             "id": response["webhook"]["id"],
             "secret": response["webhook"]["secret"],
         }
+
+    def _delete_webhook(self, webhookId):
+        """Delete the clickup instance's webhook."""
+        requestBody = {}
+        response = self._send_request("/webhook/" + webhookId, "DELETE", requestBody)
+        return response
 
     def check_request(self, request):
         """Test the data received from a clickup webhook.

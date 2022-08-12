@@ -138,6 +138,7 @@ def clickup_webhook_received():
                     clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
                 else:
                     logger.info(f"Task is already in next actions list.")
+                    # FIXME list doesn't appear from normalize task.
             elif todoistTaskExists and todoistTask["list"] == "next_actions":
                 logger.info(f"Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
