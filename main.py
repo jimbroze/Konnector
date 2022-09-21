@@ -20,6 +20,8 @@ clickup = Clickup(clickupEndpoint)
 
 # FIXME not working?
 def max_days_diff(dateIn, days):
+    """Check if a date is within a number of days from today.
+       Returns TRUE or FALSE."""
     cutoff = int((time.time() + days * 86400) * 1000)
     if dateIn is None or int(dateIn) > cutoff:
         logging.debug(f"Date {dateIn} is not before cutoff {cutoff}")
@@ -35,8 +37,9 @@ def home():
         "<ul>"
         "<li><a href='todoist/auth'>Todoist Auth</a></li>"
         "<li><a href='clickup/webhook/add'>Add Clickup webhook</a></li>"
-        "</ul>"
-    )
+        "<li><a href='clickup/webhook/delete'>Delete Clickup webhook</a></li>"
+        "<li><a href='clickup/webhook/get'>Get Clickup webhook</a></li>"
+        "</ul>")
 
 
 # @app.route('/auth/init/<appname>')
@@ -58,26 +61,32 @@ elif AUTH == "clickup":
     def clickup_update_webhook():
         return clickup.modify_webhook(request)
 
+    @app.route("/clickup/webhook/delete")
+    def clickup_delete_webhook():
+        return clickup.delete_webhook(request)
 
-# Todoist:
-#   added: add
-#       inbox: inbox
-#      Alexa-todo: inbox?
-#       Food: Food
-#   updated: task
-#       next_action: task
-#   completed: task
-#       next_action: task
-# Clickup:
-#   updated: task
-#       next_action: task
-#   completed: task
-#       next_action: task
+    @app.route("/clickup/webhook/get")
+    def clickup_get_webhook():
+        return clickup.get_webhook(request)
 
 
 # Todoist webhooks.
 @app.route("/todoist/webhook", methods=["POST"])
 def todoist_webhook():
+    """
+    Process Todoist Webhooks.
+    
+    Logic:
+      webhook: action
+        list: list
+      
+      task_added: move to Clickup list
+        inbox: inbox
+        Alexa-todo: inbox
+        Food: Food
+      task_updated, task_completed: Update Clickup task
+        next_action: N/A
+    """
     try:
         todoistRequest = todoist.check_request(request)
         todoistTask = todoist.get_task(todoistRequest)
@@ -98,20 +107,50 @@ def todoist_webhook():
                 )
             clickupTask = move_task(inputData, outputData, deleteTask=True)
         elif todoistRequest["event"] in [
-            "task_complete",
-            "task_updated",
-            "task_removed",
+                "task_complete",
+                "task_updated",
+                "task_removed",
         ]:
-            clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
+            clickupTask = modify_task(inputData, outputData,
+                                      todoistRequest["event"])
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing Todoist webhook: {e}")
         return make_response(repr(e), 202)
 
 
+# Clickup:
+#   updated: task
+#       next_action: task
+#   completed: task
+#       next_action: task
 # Clickup webhook
 @app.route(clickupEndpointQuery, methods=["POST"])
 def clickup_webhook_received():
+    """
+    Process Clickup Webhooks.
+
+    Logic:
+      webhook:
+        1: action
+          list: list
+      
+      task_updated:
+        1: add to or delete from Todoist list as per criteria below
+          next_actions: next_actions
+        2: update Todoist task
+          next_actions: N/A
+      task_completed, task_removed:
+        1: Update Clickup task
+          next_action: N/A
+
+    Criteria:
+      next_actions:
+        status = "next action"
+        AND priority < 3 (high or urgent)
+          OR  due_date < (now + 3)            
+          OR  not a subtask (Not project tasks)
+    """
     try:
         clickupRequest = clickup.check_request(request)
         clickupTask = clickup.get_task(clickupRequest["data"])
@@ -121,21 +160,24 @@ def clickup_webhook_received():
             "task": clickupTask,
         }
         outputData = {"platform": todoist}
-        todoistTaskExists, todoistTask = todoist.check_if_task_exists(clickupTask)
+        todoistTaskExists, todoistTask = todoist.check_if_task_exists(
+            clickupTask)
 
         if clickupRequest["event"] in ["task_updated"]:
             # Clickup task into todoist next_actions.
             # Next action status and (high priority, due date < 1 week, no project.)
             if clickupTask["status"] == "next action" and (
-                clickupTask["priority"] < 3
-                or max_days_diff(clickupTask["due_date"], days=3)
-                or not clickup.is_subtask(clickupTask)
-            ):
+                    clickupTask["priority"] < 3
+                    or max_days_diff(clickupTask["due_date"], days=3)
+                    or not clickup.is_subtask(clickupTask)):
                 outputData["list"] = "next_actions"
                 if not todoistTaskExists:
                     logger.info(f"Adding task to next actions list.")
-                    todoistTask = move_task(inputData, outputData, deleteTask=False)
-                    clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
+                    todoistTask = move_task(inputData,
+                                            outputData,
+                                            deleteTask=False)
+                    clickup.add_todoist_id(clickupTask,
+                                           todoistTask["todoist_id"])
                 else:
                     logger.info(f"Task is already in next actions list.")
                     # FIXME list doesn't appear from normalize task.
@@ -144,28 +186,37 @@ def clickup_webhook_received():
                 todoist.delete_task(clickupTask)
 
             else:
-                todoistTask = modify_task(
-                    inputData, outputData, clickupRequest["event"]
-                )
+                todoistTask = modify_task(inputData, outputData,
+                                          clickupRequest["event"])
 
         # Update Clickup task in Todoist
-        elif (
-            clickupRequest["event"]
-            in [
+        elif (clickupRequest["event"] in [
                 "task_complete",
                 "task_removed",
-            ]
-            and todoistTaskExists
-        ):
+        ] and todoistTaskExists):
             # TODO complete task if status set to complete.
-            todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
+            todoistTask = modify_task(inputData, outputData,
+                                      clickupRequest["event"])
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logging.warning(f"Error in processing clickup webhook: {e}")
         return make_response(repr(e), 202)
 
 
-def move_task(input, output, deleteTask=False):
+def move_task(input, output, deleteTask: bool = False):
+    """
+    Move or copy a task from a list in one platform to a list in another.
+    Parameters
+    ----------
+    input : dict
+      - platform : dict
+        - name : string
+    output : dict
+      - platform : dict
+        - name : string
+    deleteTask : bool
+      If the task should be moved rather than copied.
+    """
     inPlatformName = input["platform"].name
     outPlatformName = output["platform"].name
     logger.info(

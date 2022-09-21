@@ -12,7 +12,9 @@ class Clickup:
     name = "clickup"
     accessToken = os.environ["CLICKUP_TOKEN"]
     workspace = "2193273"
-    clickupEvents = ["taskUpdated", "taskDeleted", "taskStatusUpdated", "taskMoved"]
+    clickupEvents = [
+        "taskUpdated", "taskDeleted", "taskStatusUpdated", "taskMoved"
+    ]
     # clickupEvents = "*"
     events = {
         "next action": "next_action",
@@ -36,10 +38,14 @@ class Clickup:
         """"""
         self.endpoint = endpoint
 
-    def modify_webhook(self, request, delete=False):
+    def get_webhook(self, request):
+        """Delete the clickup instance's webhook."""
+        response = self._send_request("team/" + self.workspace + "/webhook",
+                                      "GET")
+        return response
+
+    def modify_webhook(self, request):
         """Create or update the clickup webhook"""
-        if delete:
-            return self._delete_webhook(self.webhookId)
         if self.webhookId is not None:
             return self._update_webhook(
                 self.webhookId,
@@ -60,11 +66,10 @@ class Clickup:
         Uses the Clickup instance's workspace ID, endpoint and events.
         """
         requestBody = {"endpoint": endpoint, "events": events}
-        if listId is not None:
-            requestBody["list_id"] = listId
-        response = self._send_request(
-            "team/" + workspace + "/webhook", "POST", requestBody
-        )
+        # if listId is not None:
+        #     requestBody["list_id"] = listId
+        response = self._send_request("team/" + workspace + "/webhook", "POST",
+                                      requestBody, {"Content-Type": "application/json"})
         return {
             "id": response["webhook"]["id"],
             "secret": response["webhook"]["secret"],
@@ -78,19 +83,24 @@ class Clickup:
         - id: Received data
         - secret: Clickup event
         """
-        requestBody = {"endpoint": endpoint, "events": events, "status": "active"}
+        requestBody = {
+            "endpoint": endpoint,
+            "events": events,
+            "status": "active"
+        }
         if listId is not None:
             requestBody["list_id"] = listId
-        response = self._send_request("/webhook/" + webhookId, "PUT", requestBody)
+        response = self._send_request("webhook/" + webhookId, "PUT",
+                                      requestBody)
         return {
             "id": response["webhook"]["id"],
             "secret": response["webhook"]["secret"],
         }
 
-    def _delete_webhook(self, webhookId):
+    def delete_webhook(self, request):
         """Delete the clickup instance's webhook."""
-        requestBody = {}
-        response = self._send_request("/webhook/" + webhookId, "DELETE", requestBody)
+        webhookId = self.webhookId
+        response = self._send_request("webhook/" + webhookId, "DELETE")
         return response
 
     def check_request(self, request):
@@ -134,7 +144,9 @@ class Clickup:
         listId = str(listId)
         if listId not in self.lists.values():
             raise Exception(f"Invalid Clickup List: {listId}")
-        listName = [key for key, value in self.lists.items() if value == listId][0]
+        listName = [
+            key for key, value in self.lists.items() if value == listId
+        ][0]
         logger.debug(f"Clickup list: {listName}")
         return listName
 
@@ -145,10 +157,10 @@ class Clickup:
         logger.debug(f"Clickup event: {normalisedEvent}")
         return normalisedEvent
 
-    def _send_request(self, location, reqType="GET", data={}):
+    def _send_request(self, location, reqType="GET", data={}, headers={}):
         return helpers.send_request(
             "https://api.clickup.com/api/v2/" + str(location),
-            {"Authorization": self.accessToken},
+            {"Authorization": self.accessToken, **headers},
             reqType,
             data,
         )
@@ -175,25 +187,19 @@ class Clickup:
         if "due_date_time" in clickupTask:
             outTask["due_time_included"] = clickupTask["due_date_time"]
 
-        if (
-            "priority" in clickupTask
-            and clickupTask["priority"] is not None
-            and "id" in clickupTask["priority"]
-        ):
+        if ("priority" in clickupTask and clickupTask["priority"] is not None
+                and "id" in clickupTask["priority"]):
             outTask["priority"] = int(clickupTask["priority"]["id"])
         if "parent" in clickupTask and clickupTask["parent"] is not None:
             outTask["parentTask"] = clickupTask["parent"]
 
         if "clickup_complete" in clickupTask:
-            outTask["clickup_complete"] = (
-                True if clickupTask["status"] == "complete" else False
-            )
+            outTask["clickup_complete"] = (True if clickupTask["status"]
+                                           == "complete" else False)
         if "custom_fields" in clickupTask:
             for customField in clickupTask["custom_fields"]:
-                if (
-                    customField["id"] == self.customFieldTodoist
-                    and "value" in customField
-                ):
+                if (customField["id"] == self.customFieldTodoist
+                        and "value" in customField):
                     outTask["todoist_id"] = customField["value"]
         return outTask
 
@@ -201,12 +207,11 @@ class Clickup:
         logger.debug(f"Getting Clickup Task")
         clickupTask = self._send_request("task/" + str(data["task_id"]))
         outTask = {
-            "clickup_id": (
-                clickupTask["custom_id"]
-                if "custom_id" in clickupTask and clickupTask["custom_id"] is not None
-                else clickupTask["id"]
-            ),
-            "status": clickupTask["status"]["status"],
+            "clickup_id":
+            (clickupTask["custom_id"] if "custom_id" in clickupTask
+             and clickupTask["custom_id"] is not None else clickupTask["id"]),
+            "status":
+            clickupTask["status"]["status"],
             **self._normalize_task(clickupTask),
         }
         if "priority" not in outTask:
@@ -215,16 +220,15 @@ class Clickup:
         if "history_items" in data:
             clickupTaskUpdates = {}
             for updatedField in data["history_items"]:
-                clickupTaskUpdates[updatedField["field"]] = updatedField["after"]
+                clickupTaskUpdates[
+                    updatedField["field"]] = updatedField["after"]
                 # Clickup only provides time included bool with update data.
-                if (
-                    updatedField["field"] == "due_date"
-                    and "due_date_time" in updatedField["data"]
-                ):
+                if (updatedField["field"] == "due_date"
+                        and "due_date_time" in updatedField["data"]):
                     clickupTaskUpdates["due_date_time"] = updatedField["data"][
-                        "due_date_time"
-                    ]
-                    outTask["due_time_included"] = updatedField["data"]["due_date_time"]
+                        "due_date_time"]
+                    outTask["due_time_included"] = updatedField["data"][
+                        "due_date_time"]
             outTask["updates"] = self._normalize_task(clickupTaskUpdates)
         logger.debug(f"Clickup Task: {outTask}")
         return outTask
@@ -242,12 +246,10 @@ class Clickup:
             clickupTask["priority"] = task["priority"]
         if new == True:
             clickupTask["assignees"] = [self.userId[0]]
-            clickupTask["custom_fields"] = [
-                {
-                    "id": self.customFieldTodoist,  # Todoist ID
-                    "value": str(task["todoist_id"]),
-                }
-            ]
+            clickupTask["custom_fields"] = [{
+                "id": self.customFieldTodoist,  # Todoist ID
+                "value": str(task["todoist_id"]),
+            }]
         logger.debug(f"Clickup Task: {clickupTask}")
         return clickupTask
 
@@ -255,21 +257,18 @@ class Clickup:
         listId = self.lists[list]
         # Check for existing ID
         if "todoist_id" in task:
-            queryParams = (
-                'custom_fields=[{"field_id":"'
-                + self.customFieldTodoist
-                + '","operator":"=","value":'
-                + str(task["todoist_id"])
-                + "}]"
-            )
+            queryParams = ('custom_fields=[{"field_id":"' +
+                           self.customFieldTodoist +
+                           '","operator":"=","value":' +
+                           str(task["todoist_id"]) + "}]")
             projectTasks = self._send_request(
-                f"list/{listId}/task?{queryParams}", "GET", {}
-            )
+                f"list/{listId}/task?{queryParams}", "GET", {})
             if not projectTasks:
                 raise Exception("Todoist ID already exists in Clickup list.")
 
         clickupTask = self._convert_task_to(task, new=True)
-        response = self._send_request(f"list/{str(listId)}/task", "POST", clickupTask)
+        response = self._send_request(f"list/{str(listId)}/task", "POST",
+                                      clickupTask)
         return response
 
     def add_todoist_id(self, task, id):
