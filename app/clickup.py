@@ -3,9 +3,10 @@ import hmac
 import hashlib
 import logging
 
-import helpers
+import app.helpers as helpers
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
+logger = logging.getLogger('gunicorn.error')
 
 
 class Clickup:
@@ -23,13 +24,17 @@ class Clickup:
         "taskDeleted": "task_deleted",
         # "taskStatusUpdated": "task_removed",
     }
+    folder = "17398998"
     lists = {"inbox": "38260663", "food_log": "176574082"}
     listStatuses = {
         "38260663": ["next action", "complete"],
     }
-    # webhookId = None
-    webhookId = os.environ["CLICKUP_WEBHOOK_ID"]
-    webhookSecret = os.environ["CLICKUP_WEBHOOK_SECRET"]
+    try:
+        webhookId = os.environ["CLICKUP_WEBHOOK_ID"]
+        webhookSecret = os.environ["CLICKUP_WEBHOOK_SECRET"]
+    except:
+        webhookId = None
+        
     # -1 is Clickbot
     userId = ["2511898", 0, -1]
     customFieldTodoist = "550a93a0-6978-4664-be6d-777cc0d7aff6"
@@ -51,23 +56,24 @@ class Clickup:
                 self.webhookId,
                 self.endpoint,
                 self.clickupEvents,
-                list(self.lists.values()),
+                self.folder,
             )
         else:
             return self._create_webhook(
                 self.workspace,
                 self.endpoint,
                 self.clickupEvents,
-                list(self.lists.values()),
+                self.folder,
             )
 
-    def _create_webhook(self, workspace, endpoint, events, listId=None):
+    def _create_webhook(self, workspace, endpoint, events, folderId=None):
         """Create the clickup webhook.
         Uses the Clickup instance's workspace ID, endpoint and events.
         """
         requestBody = {"endpoint": endpoint, "events": events}
-        # if listId is not None:
-        #     requestBody["list_id"] = listId
+        # Only a single list or folder currently works. Cannot pass array of lists.
+        if folderId is not None:
+            requestBody["folder_id"] = folderId
         response = self._send_request("team/" + workspace + "/webhook", "POST",
                                       requestBody, {"Content-Type": "application/json"})
         return {
@@ -75,7 +81,7 @@ class Clickup:
             "secret": response["webhook"]["secret"],
         }
 
-    def _update_webhook(self, webhookId, endpoint, events, listId=None):
+    def _update_webhook(self, webhookId, endpoint, events, folderId=None):
         """Update the clickup instance's webhook.
         Uses the instance's workspace ID, endpoint and events
         List ID is optional.
@@ -88,8 +94,8 @@ class Clickup:
             "events": events,
             "status": "active"
         }
-        if listId is not None:
-            requestBody["list_id"] = listId
+        if folderId is not None:
+            requestBody["folder_id"] = folderId
         response = self._send_request("webhook/" + webhookId, "PUT",
                                       requestBody)
         return {

@@ -1,15 +1,16 @@
 from flask import Flask, request, jsonify, make_response  # render_template
-from todoist import Todoist
-from clickup import Clickup
-
-# import helpers
 import logging
 import time
+import os
+from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
-AUTH = "clickup"
-ENDPOINT = "https://konnector.jimdickinson.repl.co"
+from app.todoist import Todoist
+from app.clickup import Clickup
+
+AUTH = False
+ENDPOINT = os.environ["ENDPOINT"]
 clickupEndpointQuery = "/clickup/webhook/call"
 
 app = Flask(__name__)
@@ -17,6 +18,12 @@ todoist = Todoist()
 clickupEndpoint = ENDPOINT + clickupEndpointQuery
 clickup = Clickup(clickupEndpoint)
 
+logger = logging.getLogger('gunicorn.error')
+
+if __name__ == "__main__":
+    # logging.basicConfig(level=logging.DEBUG)
+    app.logger.handlers = logger.handlers
+    app.logger.setLevel(logger.level)
 
 # FIXME not working?
 def max_days_diff(dateIn, days):
@@ -45,7 +52,7 @@ def home():
 # @app.route('/auth/init/<appname>')
 # def auth():
 #   return render_template('form.html', appname=appname)
-if AUTH == "todoist":
+if AUTH == True:
 
     @app.route("/todoist/auth")
     def todoist_auth():
@@ -55,7 +62,6 @@ if AUTH == "todoist":
     def todoist_callback():
         return todoist.auth_callback(request)
 
-elif AUTH == "clickup":
 
     @app.route("/clickup/webhook/add")
     def clickup_update_webhook():
@@ -260,10 +266,5 @@ def checkId(task, idType):
     return True
 
 
-def main():
-    app.run(host="0.0.0.0", port=8080)
-
-
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
-    main()
+    app.run(host="0.0.0.0", port=8080)

@@ -3,7 +3,8 @@ import logging
 
 # from flask import jsonify, make_response
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
+logger = logging.getLogger('gunicorn.error')
 
 
 def send_request(url, headers, reqType="GET", data={}):

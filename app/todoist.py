@@ -7,9 +7,10 @@ import logging
 import time, datetime
 from dateutil import tz
 
-import helpers
+import app.helpers as helpers
 
-logger = logging.getLogger(__name__)
+# logger = logging.getLogger(__name__)
+logger = logging.getLogger('gunicorn.error')
 
 
 def convert_time_from(s):
@@ -85,7 +86,7 @@ class Todoist:
     def __init__(self):
         """"""
 
-    def auth_init(self):
+    def auth_init(self, request):
         return "<a href='" + self.authLink + "'>Click to authorize</a>"
 
     def auth_callback(self, request):
