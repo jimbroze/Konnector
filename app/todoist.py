@@ -9,8 +9,7 @@ from dateutil import tz
 
 import app.helpers as helpers
 
-# logger = logging.getLogger(__name__)
-logger = logging.getLogger('gunicorn.error')
+logger = logging.getLogger("gunicorn.error")
 
 
 def convert_time_from(s):
@@ -73,10 +72,11 @@ class Todoist:
     }
     projects = {
         "inbox": "2200213434",
-        "alexa": "2231741057",
+        "alexa-todo": "2231741057",
         "food_log": "2291635541",
         "next_actions": "2284385839",
     }
+    new_task_projects = ["inbox", "alexa-todo"]
     # projectEvents = {
     #     'item:added': ["inbox", "alexa"],
     #     'item:completed': ["next_actions"],
@@ -136,7 +136,12 @@ class Todoist:
         event = self._check_event(data["event_name"])
         project = self._check_project(data["event_data"]["project_id"])
 
-        return {"data": data, "event": event, "list": project}
+        task = data["event_data"]
+        task["new"] = True if request["event"] == "new_task" else False
+        normalizedTask = self._normalize_task(task)
+        logger.debug(f"Normalized Todoist task: {normalizedTask}")
+
+        return {"event": event, "list": project}, normalizedTask
 
     def _check_project(self, projectId):
         projectId = str(projectId)
@@ -166,15 +171,14 @@ class Todoist:
             data,
         )
 
-    def _normalize_priority(self, todoistTask):
-        """Sets the priority of new tasks to 2 so that 1 is lower than "normal".
-        Prority from 1 to 4 will then be reversed during task normalization."""
-
-        if "priority" in todoistTask and todoistTask["priority"] == 1:
-            todoistTask["priority"] = 2
-        return todoistTask
-
     def _normalize_task(self, todoistTask):
+        # Sets the priority of new tasks to 2 so that 1 is lower than "normal".
+        if (
+            "priority" in todoistTask
+            and todoistTask["new"] == True
+            and todoistTask["priority"] == 1
+        ):
+            todoistTask["priority"] = 2
         outTask = {
             "todoist_id": todoistTask["id"],
             "name": todoistTask["content"],
@@ -185,8 +189,7 @@ class Todoist:
                 or ("completed" in todoistTask and todoistTask["completed"] == True)
                 else False
             ),
-            # Priority is reversed (When 4 becomes ooooooooone)
-            # in Todoist, 4 is highest.
+            # Priority is reversed (When 4 becomes oooone). In Todoist, 4 is highest.
             "priority": 5 - todoistTask["priority"],
         }
         if (
@@ -205,17 +208,15 @@ class Todoist:
             outTask["due_date"] = None
         return outTask
 
-    # TODO rename method?
-    def get_task(self, request):
-        data = request["data"]
-        task = (
-            self._normalize_priority(data["event_data"])
-            if request["event"] == "new_task"
-            else data["event_data"]
-        )
-        outTask = self._normalize_task(task)
-        logger.debug(f"Normalized Todoist task: {outTask}")
-        return outTask
+    def get_tasks(self, project):
+        projectId = self.projects[project]
+        projectTasks = self._send_request(f"/tasks?project_id={projectId}", "GET")
+        for projectTask in projectTasks:
+            projectTask["new"] = True if project in self.new_task_projects else False
+        todoistTasks = [
+            self._normalize_task(projectTask) for projectTask in projectTasks
+        ]
+        return todoistTasks
 
     def _convert_task(self, task, projectId=""):
         todoistTask = {}
@@ -236,6 +237,7 @@ class Todoist:
 
         if projectId != "":
             todoistTask["project_id"] = projectId
+            todoistTask["list"]
         if "priority" in task:
             todoistTask["priority"] = 5 - task["priority"]
         logger.debug(todoistTask)

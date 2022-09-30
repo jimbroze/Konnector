@@ -1,3 +1,6 @@
+Issues
+- Clickup currently doesn't fire task update webhooks when subtasks update. This is a know bug.
+
 Instructions
 
 1. Make Todoist App

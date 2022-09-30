@@ -1,10 +1,20 @@
 import requests
 import logging
+import time
 
-# from flask import jsonify, make_response
+logger = logging.getLogger("gunicorn.error")
 
-# logger = logging.getLogger(__name__)
-logger = logging.getLogger('gunicorn.error')
+
+def max_days_diff(dateIn, days):
+    """Check if a date is within a number of days from today.
+    Returns TRUE or FALSE."""
+    cutoff = int((time.time() + days * 86400) * 1000)
+    if dateIn is None or int(dateIn) > cutoff:
+        logging.debug(f"Date {dateIn} is not before cutoff {cutoff}")
+        return False
+    else:
+        logging.debug(f"Date {dateIn} is before cutoff {cutoff}")
+        return True
 
 
 def send_request(url, headers, reqType="GET", data={}):
