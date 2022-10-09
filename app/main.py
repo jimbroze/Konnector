@@ -12,7 +12,7 @@ from app.todoist import Todoist
 from app.clickup import Clickup
 import app.helpers as helpers
 
-AUTH = os.environ["AUTH"]
+AUTH = os.getenv("AUTH", "False").lower() in ("true", "1")
 ENDPOINT = os.environ["ENDPOINT"]
 clickupEndpointQuery = "/clickup/webhook/call"
 
@@ -31,6 +31,7 @@ if __name__ == "__main__":
 
 @app.route("/")
 def home():
+    logger.info(f"auth is set to: {AUTH}")
     return (
         "<ul>"
         "<li><a href='todoist/auth'>Todoist Auth</a></li>"
@@ -108,7 +109,7 @@ def todoist_webhook():
             clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
-        logging.warning(f"Error in processing Todoist webhook: {e}")
+        logger.warning(f"Error in processing Todoist webhook: {e}")
         return make_response(repr(e), 202)
 
 
@@ -162,7 +163,6 @@ def clickup_webhook_received():
                     todoistTask = modify_task(
                         inputData, outputData, clickupRequest["event"]
                     )
-                    # FIXME list doesn't appear from normalize task.
             elif todoistTaskExists and todoistTask["list"] == "next_actions":
                 logger.info(f"Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
@@ -179,7 +179,7 @@ def clickup_webhook_received():
             todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
-        logging.warning(f"Error in processing clickup webhook: {e}")
+        logger.warning(f"Error in processing clickup webhook: {e}")
         return make_response(repr(e), 202)  # Response accepted. Not necessarily success
 
 
@@ -187,7 +187,7 @@ def move_todoist_inbox():
     """
     Loops through todoist "new task" lists (projects) and moves tasks to Clickup.
     """
-    logging.info("Scheduled: Checking Todoist inbox for new tasks.")
+    logger.info("Scheduled: Checking Todoist inbox for new tasks.")
     # Clickup rate limits are 100 requests per minute. Highly unlikely to reach this.
     for newTaskList in todoist.new_task_projects:
         newTodoistTasks = todoist.get_tasks(newTaskList)

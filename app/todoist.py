@@ -13,6 +13,9 @@ logger = logging.getLogger("gunicorn.error")
 
 
 def convert_time_from(s):
+    """
+    Converts a RFC3339 datestamp or timestamp into Epoch time for standardization
+    """
     if "T" in s:
         format = "%Y-%m-%dT%H:%M:%S"
         timeIncluded = True
@@ -30,6 +33,9 @@ def convert_time_from(s):
 
 
 def convert_time_to(epochTime, timeIncluded=None):
+    """
+    Converts an epoch timestamp into RFC3339 for Todoist
+    """
     # /1000 to get seconds
     dt = datetime.datetime.fromtimestamp(int(epochTime) / 1000)
     dt = dt.replace(tzinfo=tz.gettz("UTC"))
@@ -137,7 +143,7 @@ class Todoist:
         project = self._check_project(data["event_data"]["project_id"])
 
         task = data["event_data"]
-        task["new"] = True if request["event"] == "new_task" else False
+        task["new"] = True if event == "new_task" else False
         normalizedTask = self._normalize_task(task)
         logger.debug(f"Normalized Todoist task: {normalizedTask}")
 
@@ -174,7 +180,8 @@ class Todoist:
     def _normalize_task(self, todoistTask):
         # Sets the priority of new tasks to 2 so that 1 is lower than "normal".
         if (
-            "priority" in todoistTask
+            "new" in todoistTask
+            and "priority" in todoistTask
             and todoistTask["new"] == True
             and todoistTask["priority"] == 1
         ):
@@ -182,7 +189,16 @@ class Todoist:
         outTask = {
             "todoist_id": todoistTask["id"],
             "name": todoistTask["content"],
-            "todoist_project": todoistTask["project_id"],
+            "todoist_project_id": todoistTask["project_id"],
+            # TODO add this to Clickup too
+            "list": next(
+                (
+                    project
+                    for project, id in self.projects.items()
+                    if id == str(todoistTask["project_id"])
+                ),
+                None,
+            ),
             "todoist_complete": (
                 True
                 if ("checked" in todoistTask and todoistTask["checked"] == 1)
@@ -193,14 +209,13 @@ class Todoist:
             "priority": 5 - todoistTask["priority"],
         }
         if (
-            str(outTask["todoist_project"]) == str(self.projects["next_actions"])
+            str(outTask["todoist_project_id"]) == str(self.projects["next_actions"])
             and todoistTask["description"] is not None
         ):
             outTask["clickup_id"] = todoistTask["description"]
         else:
             outTask["description"] = todoistTask["description"]
         if "due" in todoistTask and todoistTask["due"] is not None:
-            # TODO is time stored separately??? Save as Epoch
             outTask["due_date"], outTask["due_time_included"] = convert_time_from(
                 todoistTask["due"]["date"]
             )
@@ -218,7 +233,7 @@ class Todoist:
         ]
         return todoistTasks
 
-    def _convert_task(self, task, projectId=""):
+    def _convert_task(self, task, project=""):
         todoistTask = {}
         if "name" in task:
             todoistTask["content"] = task["name"]
@@ -235,9 +250,9 @@ class Todoist:
             else:
                 todoistTask["due_date"] = dt
 
-        if projectId != "":
-            todoistTask["project_id"] = projectId
-            todoistTask["list"]
+        if project != "":
+            todoistTask["project_id"] = self.projects[project]
+            todoistTask["list"] = project
         if "priority" in task:
             todoistTask["priority"] = 5 - task["priority"]
         logger.debug(todoistTask)
@@ -252,7 +267,7 @@ class Todoist:
                 if str(projectTask["description"]) == str(task["clickup_id"]):
                     raise Exception("Clickup ID already exists in Todoist project.")
 
-        todoistTask = self._convert_task(task, projectId)
+        todoistTask = self._convert_task(task, project)
         response = self._send_request("/tasks", "POST", todoistTask)
         return {"todoist_id": response["id"], **response}
 
@@ -270,23 +285,23 @@ class Todoist:
 
     # TODO rename? Now returns task as well.
     def check_if_task_exists(self, task):
-        logging.info("checking if Todoist task exists")
+        logger.info("checking if Todoist task exists")
         if "todoist_id" not in task:
-            logging.debug("No todoist Id.")
+            logger.debug("No todoist Id.")
             return False, {}
         try:
             response = self._send_request(f"/tasks/{task['todoist_id']}")
         except:
-            logging.debug("Error retrieving task.")
+            logger.debug("Error retrieving task.")
             return False, {}
         if response is None or response == {} or response == "":
-            logging.debug("No task found.")
+            logger.debug("No task found.")
             return False, {}
         todoistTask = self._normalize_task(response)
         if response["completed"] == True:
-            logging.debug("Todoist task already complete")
+            logger.debug("Todoist task already complete")
             return False, todoistTask
-        logging.debug("Todoist task exists.")
+        logger.debug("Todoist task exists.")
         return True, todoistTask
 
     def update_task(self, task):
