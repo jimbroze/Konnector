@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 import time
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
+# from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
 load_dotenv()
 
@@ -202,7 +203,9 @@ def move_todoist_inbox():
 
 
 # Schedule check of todoist inbox in case webhook hasn't worked.
-scheduler = BackgroundScheduler()
+scheduler = BackgroundScheduler(
+    # jobstores={"default": SQLAlchemyJobStore(url="sqlite:///jobs.sqlite")}
+)
 scheduler.add_job(func=move_todoist_inbox, trigger="interval", minutes=10)
 scheduler.start()
 # Shut down the scheduler when exiting the app
