@@ -31,6 +31,7 @@ bind = use_bind
 keepalive = 120
 errorlog = "-"
 accesslog = "-"
+preload_app = True
 
 # For debugging and testing
 log_data = {
