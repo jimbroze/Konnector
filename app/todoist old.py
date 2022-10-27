@@ -2,7 +2,6 @@ import os
 import base64
 import hmac
 import hashlib
-from task import Task, Platform
 import uuid
 import logging
 import time, datetime
@@ -13,7 +12,6 @@ import app.helpers as helpers
 logger = logging.getLogger("gunicorn.error")
 
 
-# TODO review these time funcs
 def convert_time_from(s):
     """
     Converts a RFC3339 datestamp or timestamp into Epoch time for standardization
@@ -59,40 +57,13 @@ def convert_time_to(epochTime, timeIncluded=None):
     return formattedDt, timeIncluded
 
 
-class Todoist(Platform):
+class Todoist:
     name = "todoist"
-    accessToken = os.environ["TODOIST_ACCESS"]
     clientId = os.environ["TODOIST_CLIENT_ID"]
     secret = os.environ["TODOIST_SECRET"]
-    userIds = ["20038827"]
-    lists = {
-        "inbox": "2200213434",
-        "alexa-todo": "2231741057",
-        "food_log": "2291635541",
-        "next_actions": "2284385839",
-    }
-    new_task_lists = ["inbox", "alexa-todo"]
-    webhookEvents = {
-        "item:added": "new_task",
-        "item:completed": "task_complete",
-        "item:updated": "task_updated",
-    }
-    signatureKey = "X-Todoist-Hmac-SHA256"
-    headers = {
-        "Authorization": "Bearer " + str(accessToken),
-        "X-Request-Id": str(uuid.uuid4()),
-    }
-    propertyMappings = {
-        "name": "content",
-        "description": "description",
-        "priority": "priority",
-        "due_date": "due_date",
-    }
-    listIdMapping = "project_id"
-    taskIdMapping = "id"
-    taskCompleteMapping = "checked"
-
     state = os.environ["TODOIST_STATE"]
+    userId = "20038827"
+    accessToken = os.environ["TODOIST_ACCESS"]
     authLink = (
         "https://todoist.com/oauth/authorize?client_id="
         + clientId
@@ -100,6 +71,23 @@ class Todoist(Platform):
         + "&state="
         + state
     )
+    events = {
+        "item:added": "new_task",
+        "item:completed": "task_complete",
+        "item:updated": "task_updated",
+    }
+    projects = {
+        "inbox": "2200213434",
+        "alexa-todo": "2231741057",
+        "food_log": "2291635541",
+        "next_actions": "2284385839",
+    }
+    new_task_projects = ["inbox", "alexa-todo"]
+    # projectEvents = {
+    #     'item:added': ["inbox", "alexa"],
+    #     'item:completed': ["next_actions"],
+    #     'item:updated': ["next_actions"]
+    # }
 
     def __init__(self):
         """"""
@@ -125,53 +113,115 @@ class Todoist(Platform):
             response["access_token"] if response["access_token"] else response["error"]
         )
 
-    def _digest_hmac(self, hmac: hmac.HMAC):
-        return base64.b64encode(hmac.digest()).decode("utf-8")
-
-    def _get_check_user_from_webhook(self, data):
-        return super()._get_check_user_from_webhook(data["user_id"])
-
-    def _get_check_list_from_webhook(self, data):
-        return super()._get_check_list_from_webhook(data["event_data"]["project_id"])
-
-    def _get_check_event_from_webhook(self, data):
-        return super()._get_check_event_from_webhook(data["event_name"])
-
-    def _get_task_from_webhook(self, data):
-        return data["event_data"]
-
     def check_request(self, request):
+        """Check headers are valid and get the event.
+        Returns dict with:
+        - data
+        - event.
+        """
+        logger.info(f"Todoist request received. Checking headers.")
         if request.headers["User-Agent"] != "Todoist-Webhooks":
             return {"error": "Bad user agent"}
-        return super().check_request(request)
+        calcHmac = base64.b64encode(
+            hmac.new(
+                bytes(self.secret, "utf-8"),
+                msg=request.get_data(),
+                digestmod=hashlib.sha256,
+            ).digest()
+        ).decode("utf-8")
+        if request.headers["X-Todoist-Hmac-SHA256"] != calcHmac:
+            raise Exception("Bad HMAC")
+        logger.debug(f"Headers check OK.")
 
-    def _send_request(self, apiLocation, reqType="GET", params=..., data=...):
-        return super()._send_request(apiLocation, reqType, params, data)
+        data = request.get_json(force=True)
+        logger.debug(f"Request data: {data}")
 
-    def convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
-        task = super().convert_task_from_platform(platformTask, new)
+        if str(data["user_id"]) != self.userId:
+            raise Exception("Invalid User")
 
+        event = self._check_event(data["event_name"])
+        project = self._check_project(data["event_data"]["project_id"])
+
+        task = data["event_data"]
+        task["new"] = True if event == "new_task" else False
+        normalizedTask = self._normalize_task(task)
+        logger.debug(f"Normalized Todoist task: {normalizedTask}")
+
+        return {"event": event, "list": project}, normalizedTask
+
+    def _check_project(self, projectId):
+        projectId = str(projectId)
+        if projectId not in self.projects.values():
+            raise Exception(f"Invalid Todoist project: {projectId}")
+        projectName = [
+            key for key, value in self.projects.items() if value == projectId
+        ][0]
+        logger.debug(f"Todoist project: {projectName}")
+        return projectName
+
+    def _check_event(self, todoistEvent):
+        if todoistEvent not in self.events:
+            raise Exception(f"Invalid Todoist event: {todoistEvent}")
+        normalisedEvent = self.events[todoistEvent]
+        logger.debug(f"Todoist event: {normalisedEvent}")
+        return normalisedEvent
+
+    def _send_request(self, location, reqType="GET", data={}):
+        return helpers.send_request(
+            "https://api.todoist.com/rest/v1" + str(location),
+            {
+                "Authorization": "Bearer " + str(self.accessToken),
+                "X-Request-Id": str(uuid.uuid4()),
+            },
+            reqType,
+            data,
+        )
+
+    def _normalize_task(self, todoistTask):
         # Sets the priority of new tasks to 2 so that 1 is lower than "normal".
-        if new and task.properties["priority"] == 1:
-            task.properties["priority"] = 2
-        # Priority is reversed (When 4 becomes oooone). In Todoist, 4 is highest.
-        task.properties["priority"] = 5 - task.properties["priority"]
-
-        # Description in next actions list tasks used to store Clickup ID
-        if task.fromList == self.lists["next_actions"] and task.properties[
-            "description"
-        ] not in [None, ""]:
-            task.ids["clickup_id"] = task.properties["description"]
-            task.properties["description"] = ""
-
-        if "due" in platformTask and platformTask["due"] is not None:
-            (task.properties["due_date"]) = convert_time_from(
-                platformTask["due"]["date"]
+        if (
+            "new" in todoistTask
+            and "priority" in todoistTask
+            and todoistTask["new"] == True
+            and todoistTask["priority"] == 1
+        ):
+            todoistTask["priority"] = 2
+        outTask = {
+            "todoist_id": todoistTask["id"],
+            "name": todoistTask["content"],
+            "todoist_project_id": todoistTask["project_id"],
+            # TODO add this to Clickup too
+            "list": next(
+                (
+                    project
+                    for project, id in self.projects.items()
+                    if id == str(todoistTask["project_id"])
+                ),
+                None,
+            ),
+            "todoist_complete": (
+                True
+                if ("checked" in todoistTask and todoistTask["checked"] == 1)
+                or ("completed" in todoistTask and todoistTask["completed"] == True)
+                else False
+            ),
+            # Priority is reversed (When 4 becomes oooone). In Todoist, 4 is highest.
+            "priority": 5 - todoistTask["priority"],
+        }
+        if (
+            str(outTask["todoist_project_id"]) == str(self.projects["next_actions"])
+            and todoistTask["description"] is not None
+        ):
+            outTask["clickup_id"] = todoistTask["description"]
+        else:
+            outTask["description"] = todoistTask["description"]
+        if "due" in todoistTask and todoistTask["due"] is not None:
+            outTask["due_date"], outTask["due_time_included"] = convert_time_from(
+                todoistTask["due"]["date"]
             )
-
-        return task
-
-    # FIXME Checked up to here !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        else:
+            outTask["due_date"] = None
+        return outTask
 
     def get_tasks(self, project):
         projectId = self.projects[project]

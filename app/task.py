@@ -28,6 +28,7 @@ class Task:
         "due_date": None,  # time since epoch
     }
     fromList = None
+    fromListCompleted = None
     toList = None
     new = False
     ids = {}
@@ -37,6 +38,7 @@ class Task:
         name: str = None,
         properties: dict = None,
         fromList: str = None,
+        fromListCompleted: bool = None,
         toList: str = None,
         new: bool = None,
         ids: dict = None,
@@ -49,6 +51,8 @@ class Task:
                 self.properties[propName] = properties[propName]
         if fromList is not None:
             self.fromList = fromList
+        if fromListCompleted is not None:
+            self.fromListCompleted = fromListCompleted
         if toList is not None:
             self.toList = toList
         if new is not None:
@@ -96,13 +100,18 @@ class Platform:
     """A productivity platform with an API."""
 
     name = ""
+    apiUrl = "https://api.todoist.com/rest/v1"
     accessToken = ""
     clientId = ""
     secret = ""
     userIds = []
-    lists = []
+    lists = {}
     new_task_lists = []
-    webhookEvents = []
+    webhookEvents = {
+        "new_task": "new_task",
+        "task_complete": "task_complete",
+        "task_updated": "task_updated",
+    }
     signatureKey = ""
     headers = {}
     propertyMappings = {
@@ -111,6 +120,9 @@ class Platform:
         "priority": "priority",
         "due_date": "due_date",
     }
+    listIdMapping = "list_id"
+    taskIdMapping = "id"
+    taskCompleteMapping = "completed"
 
     def __init__():
         """initalise a platfom"""
@@ -118,25 +130,43 @@ class Platform:
     def __str__(self):
         return f"{self.name}"
 
-    def _digest_hmac(self, hmac):
+    def _digest_hmac(self, hmac: hmac.HMAC):
         return hmac.digest()
 
-    def _get_user_from_webhook(self, data):
-        return data["user_Id"]
+    def _get_check_user_from_webhook(self, userId):
+        """ """
 
-    def _get_list_from_webhook(self, data):
-        return data["list_Id"]
+        if userId not in self.userIds:
+            raise Exception(f"Unrecognised {self} User: {userId}")
+        logger.debug(f"{self} user recognised: {userId}")
+        return userId
 
-    def _get_event_from_webhook(self, data):
-        return data["event_name"]
+    def _get_check_list_from_webhook(self, listId):
+        """
+        Check if the event that fired the webhook is recognised. Raise an exception otherwise.
+        """
+
+        if listId not in self.lists.values():
+            raise Exception(f"Invalid {self} list ID: {listId}")
+        listName = reverse_lookup(listId, self.lists)
+        logger.debug(f"{self} list recognised: {listName}. ID: {listId}")
+        return listName, listId
+
+    def _get_check_event_from_webhook(self, platformEvent):
+        """
+        Check if the event that fired the webhook is recognised. Raise an exception otherwise.
+        """
+
+        if platformEvent not in self.webhookEvents.values():
+            raise Exception(f"Invalid {self} event: {platformEvent}")
+        eventType = self.webhookEvents[platformEvent]
+        logger.debug(
+            f"{self} event recognised: {eventType}. Clickup notation: {platformEvent}"
+        )
+        return eventType, platformEvent
 
     def _get_task_from_webhook(self, data):
-        return data["event_data"]
-
-    # def _get_query_params(self):
-    #     queryParams = ""
-    #     if listId is not None:
-    #         queryParams += f"list_id={listId}"
+        return data
 
     def _get_url_get_task(self, params):
         return "/task", params
@@ -153,7 +183,7 @@ class Platform:
     def _get_url_complete_task(self, params):
         return f"/task/{str(params['taskId'])}", params
 
-    def _send_request(self, url, reqType="GET", params={}, data={}):
+    def _send_request(self, apiLocation, reqType="GET", params={}, data={}):
         """
         Send a http request to the platform's API.
         Requires a URL. Optionally requires a request type, parameters and request data.
@@ -161,14 +191,15 @@ class Platform:
         """
         # queryParams = self._get_query_params(params)
         headers = self.headers
+        fullUrl = self.apiUrl + apiLocation
         try:
             if not data:
                 response = requests.request(
-                    reqType, url, headers=headers, params=params
+                    reqType, fullUrl, headers=headers, params=params
                 )
             else:
                 response = requests.request(
-                    reqType, url, headers=headers, json=data, params=params
+                    reqType, fullUrl, headers=headers, json=data, params=params
                 )
 
             # Raise exception if error code returned
@@ -202,24 +233,40 @@ class Platform:
                 platformProps[platformPropName] = propValue
         return platformProps, task.properties
 
-    def _normalize_task(self, task) -> Task:
-        return None
+    def convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
+        """
+        Convert tasks into Task objects
+        """
+        logger.debug(f"Converting {self} task into a task object")
 
-    def _check_event(self, event):
-        return None
+        taskProps = {}
+        for propName, platformPropName in self.propertyMappings.items():
+            if platformPropName in platformTask:
+                taskProps[propName] = platformTask[platformPropName]
 
-    def _check_list(self, listName: str):
-        return None
+        fromList = reverse_lookup(platformTask[self.listIdMapping], self.lists)
+        # TODO does this correctly give boolean?
+        fromListCompleted = (
+            platformTask[self.taskCompleteMapping]
+            if self.taskCompleteMapping in platformTask
+            else None
+        )
+        ids = {f"{self}_id": platformTask[self.taskIdMapping]}
+
+        return Task(
+            properties=taskProps,
+            fromList=fromList,
+            fromListCompleted=fromListCompleted,
+            new=new,
+            ids=ids,
+        )
 
     def check_request(self, request):
         """
         Test the data received from a webhook.
         Tests are: auth (HMAC), user validity, event validity, list validity.
         Arguments:
-            task (Task): An object containing the task ID to be fetched from the API
-            normalized (bool, default=True):
-                If the tasks should be returned as Task objects
-                TODO should they always be task objects??
+            request:
         Returns:
           (dict): A dictionary containing:
             event (str): The event that fired the webhook
@@ -241,19 +288,13 @@ class Platform:
         data = request.get_json(force=True)
         logger.debug(f"Request data: {data}")
 
-        userId = self._get_user_from_webhook(data)
-        listId = self._get_list_from_webhook(data)  # TODO combine with checking funcs?
-        webhook_event = self._get_event_from_webhook(data)
-
-        if str(userId) not in self.userIds:
-            raise Exception(f"Unrecognised User: {userId}")
-
-        event = self._check_event(webhook_event)
-        listName = self._check_list(listId)
+        self._get_check_user_from_webhook(data)
+        event = self._get_check_event_from_webhook(data)
+        listName = self._get_check_list_from_webhook(data)
 
         task = self._get_task_from_webhook(data)
-        task["new"] = True if event == "new_task" else False
-        normalizedTask = self._normalize_task(task)
+        new = True if event == "new_task" else False
+        normalizedTask = self.convert_task_from_platform(task, new)
         logger.debug(f"Normalized {self} task: {normalizedTask}")
 
         return {"event": event, "listName": listName}, normalizedTask
@@ -283,7 +324,7 @@ class Platform:
             logger.debug(f"Error retrieving task {task} from {self}")
             return {}, False
         outTask = (
-            self._normalize_task(retrieved_task)
+            self.convert_task_from_platform(retrieved_task)
             if normalized == True
             else retrieved_task
         )
@@ -311,7 +352,7 @@ class Platform:
             return retrieved_tasks
         normalized_tasks = []
         for retrieved_task in retrieved_tasks:
-            normalized_task = self._normalize_task(retrieved_task)
+            normalized_task = self.convert_task_from_platform(retrieved_task)
             normalized_task["new"] = True if listName in self.new_task_lists else False
             normalized_tasks.append(normalized_task)
         return normalized_tasks
