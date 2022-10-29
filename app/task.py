@@ -1,7 +1,6 @@
 from __future__ import annotations
 import requests
 import logging
-import base64
 import hmac
 import hashlib
 
@@ -27,20 +26,19 @@ class Task:
         "priority": 3,  # 1 highest, 4 lowest. 3 is default.
         "due_date": None,  # time since epoch
     }
-    fromList = None
-    fromListCompleted = None
-    toList = None
+    dueTimeIncluded = None
     new = False
+    lists = {}
+    completed = {}
     ids = {}
 
     def __init__(
         self,
         name: str = None,
         properties: dict = None,
-        fromList: str = None,
-        fromListCompleted: bool = None,
-        toList: str = None,
         new: bool = None,
+        lists: str = None,
+        completed: bool = None,
         ids: dict = None,
     ):
         """Initialise a task"""
@@ -49,14 +47,12 @@ class Task:
         if properties is not None:
             for propName in properties:
                 self.properties[propName] = properties[propName]
-        if fromList is not None:
-            self.fromList = fromList
-        if fromListCompleted is not None:
-            self.fromListCompleted = fromListCompleted
-        if toList is not None:
-            self.toList = toList
         if new is not None:
             self.new = new
+        if lists is not None:
+            self.lists = lists
+        if completed is not None:
+            self.completed = completed
         if ids is not None:
             self.ids = ids
 
@@ -65,19 +61,28 @@ class Task:
 
     def __sub__(self, other: Task) -> Task:
         """
-        Returns a task with properties that are in the first task but not second.
-        toList is taken from the first task and fromList from the second.
-        IDs are taken from both with the first taking priority.
+        Returns a task with properties, lists and ids that are in the first task but not second.
         """
-        propDiffs = self._get_prop_differences(other)
+        propDiffs = {
+            k: (
+                self.properties[k]
+                if self.properties[k] != other.properties[k]
+                else Task.properties[k]
+            )
+            for k in self.properties
+        }
+        # TODO check if list, completed and ID comparison works correctly if needed.
+        listDiffs = {
+            k: self.lists[k] for k in self.lists if self.lists[k] != other.lists[k]
+        }
+        completedDiffs = {
+            k: self.completed[k]
+            for k in self.completed
+            if self.completed[k] != other.completed[k]
+        }
+        idDiffs = {k: self.ids[k] for k in self.ids if self.ids[k] != other.ids[k]}
         newTask = Task(
-            properties=propDiffs,
-            fromList=other.fromList,
-            toList=self.toList if self.toList is not None else self.fromList,
-            ids={
-                **other.ids,
-                **self.ids,
-            },  # self will overwrite other if there are duplicate id keys
+            properties=propDiffs, lists=listDiffs, completed=completedDiffs, ids=idDiffs
         )
         return newTask
 
@@ -100,13 +105,13 @@ class Platform:
     """A productivity platform with an API."""
 
     name = ""
-    apiUrl = "https://api.todoist.com/rest/v1"
+    apiUrl = ""
     accessToken = ""
     clientId = ""
     secret = ""
     userIds = []
     lists = {}
-    new_task_lists = []
+    newTaskLists = []
     webhookEvents = {
         "new_task": "new_task",
         "task_complete": "task_complete",
@@ -123,6 +128,8 @@ class Platform:
     listIdMapping = "list_id"
     taskIdMapping = "id"
     taskCompleteMapping = "completed"
+    authURL = ""
+    callbackURL = ""
 
     def __init__():
         """initalise a platfom"""
@@ -169,21 +176,55 @@ class Platform:
         return data
 
     def _get_url_get_task(self, params):
-        return "/task", params
+        """
+        params: taskId
+        default http method: GET
+        """
+        return "/task", "GET", params
 
     def _get_url_get_tasks(self, params):
-        return "/tasks", params
+        """
+        params: listId
+        default http method: GET
+        """
+        return "/tasks", "GET", params
 
     def _get_url_create_task(self, params):
-        return f"/list/{str(params['listId'])}/task", params
+        """
+        params: listId
+        default http method: POST
+        """
+        return f"/list/{str(params['listId'])}/task", "POST", params
 
     def _get_url_update_task(self, params):
-        return f"/task/{str(params['taskId'])}", params
+        """
+        params: taskId
+        default http method: PUT
+        """
+        return f"/task/{str(params['taskId'])}", "PUT", params
 
     def _get_url_complete_task(self, params):
-        return f"/task/{str(params['taskId'])}", params
+        """
+        params: taskId
+        default http method: POST
+        """
+        return f"/task/{str(params['taskId'])}", "POST", params
 
-    def _send_request(self, apiLocation, reqType="GET", params={}, data={}):
+    def _get_url_delete_task(self, params):
+        """
+        params: taskId
+        default http method: DELETE
+        """
+        return f"/tasks/{str(params['taskId'])}", "DELETE", params
+
+    def _send_request(
+        self,
+        url,
+        reqType: str = "GET",
+        params: dict = {},
+        data: dict = {},
+        useApiUrl: bool = True,
+    ):
         """
         Send a http request to the platform's API.
         Requires a URL. Optionally requires a request type, parameters and request data.
@@ -191,7 +232,7 @@ class Platform:
         """
         # queryParams = self._get_query_params(params)
         headers = self.headers
-        fullUrl = self.apiUrl + apiLocation
+        fullUrl = self.apiUrl + url if useApiUrl == True else url
         try:
             if not data:
                 response = requests.request(
@@ -210,10 +251,10 @@ class Platform:
 
             raise
         if "application/json" in response.headers.get("Content-Type"):
-            logger.debug(f"Request response: {response.json()}")
+            logger.debug(f"Request response (JSON): {response.json()}")
             return f"Request response: {response.json()}"
         else:
-            logger.debug(response.text)
+            logger.debug(f"Request response (text): {response.text}")
             return response.text
 
     def _convert_task_to_platform(self, task: Task, new: bool = False) -> dict:
@@ -225,15 +266,17 @@ class Platform:
         Returns:
             (dict): A dictionary of task properties matching the platform API
         """
+        logger.debug(f"Converting task object into {self} task")
         platformProps = {}
         for propName, propValue in task.properties.items():
             # Any prop could be None because of Task subtraction operation
             if propValue is not None:
                 platformPropName = self.propertyMappings[propName]
                 platformProps[platformPropName] = propValue
-        return platformProps, task.properties
 
-    def convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
+        return platformProps
+
+    def _convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
         """
         Convert tasks into Task objects
         """
@@ -244,19 +287,23 @@ class Platform:
             if platformPropName in platformTask:
                 taskProps[propName] = platformTask[platformPropName]
 
-        fromList = reverse_lookup(platformTask[self.listIdMapping], self.lists)
+        lists = {
+            f"{self}": reverse_lookup(platformTask[self.listIdMapping], self.lists)
+        }
         # TODO does this correctly give boolean?
-        fromListCompleted = (
-            platformTask[self.taskCompleteMapping]
-            if self.taskCompleteMapping in platformTask
-            else None
-        )
-        ids = {f"{self}_id": platformTask[self.taskIdMapping]}
+        completed = {
+            f"{self}": (
+                platformTask[self.taskCompleteMapping]
+                if self.taskCompleteMapping in platformTask
+                else None
+            )
+        }
+        ids = {f"{self}": platformTask[self.taskIdMapping]}
 
         return Task(
             properties=taskProps,
-            fromList=fromList,
-            fromListCompleted=fromListCompleted,
+            lists=lists,
+            completed=completed,
             new=new,
             ids=ids,
         )
@@ -294,8 +341,8 @@ class Platform:
 
         task = self._get_task_from_webhook(data)
         new = True if event == "new_task" else False
-        normalizedTask = self.convert_task_from_platform(task, new)
-        logger.debug(f"Normalized {self} task: {normalizedTask}")
+        normalizedTask = self._convert_task_from_platform(task, new)
+        logger.debug(f"Normalized {self} webhook task: {normalizedTask}")
 
         return {"event": event, "listName": listName}, normalizedTask
 
@@ -313,24 +360,26 @@ class Platform:
         """
 
         logger.debug(f"Getting {self} task")
-        if f"{self.name}_id" not in task:
-            logger.debug(f"{self.name}_id does not exist in the task: {task}")
+        if f"{self.name}" not in task:
+            logger.debug(f"{self.name} ID does not exist in the task: {task}")
             return {}, False
-        taskId = task[f"{self}_id"]
-        url, params = self._get_url_get_task({"taskId": taskId})
+        taskId = task.ids[f"{self}"]
+        url, reqType, params = self._get_url_get_task({"taskId": taskId})
         try:
-            retrieved_task = self._send_request(url, "GET", params)
+            retrieved_task = self._send_request(url, reqType, params)
         except:
             logger.debug(f"Error retrieving task {task} from {self}")
             return {}, False
         outTask = (
-            self.convert_task_from_platform(retrieved_task)
+            self._convert_task_from_platform(retrieved_task)
             if normalized == True
             else retrieved_task
         )
+        logger.info(f"{self} task retrieved.")
+        logger.debug(f"Retrieved task: {outTask}")
         return outTask, True
 
-    def get_tasks(self, listName: str = None, normalized=True):
+    def get_tasks(self, listName: str = None, normalized=True) -> list[Task]:
         """
         Get a list of tasks from the platform's API.
         Arguments:
@@ -342,20 +391,22 @@ class Platform:
             (list): A list of (Task) objects
         """
         listId = self.lists[listName]
-        url, params = self._get_url_get_tasks({"listId": listId})
+        url, reqType, params = self._get_url_get_tasks({"listId": listId})
         try:
-            retrieved_tasks = self._send_request(url, "GET", params)
+            retrievedTasks = self._send_request(url, reqType, params)
         except:
             raise Exception(f"Error getting tasks from {self}.")
 
         if normalized == False:
-            return retrieved_tasks
-        normalized_tasks = []
-        for retrieved_task in retrieved_tasks:
-            normalized_task = self.convert_task_from_platform(retrieved_task)
-            normalized_task["new"] = True if listName in self.new_task_lists else False
-            normalized_tasks.append(normalized_task)
-        return normalized_tasks
+            return retrievedTasks
+        normalizedTasks = []
+        for retrievedTask in retrievedTasks:
+            normalizedTask = self._convert_task_from_platform(retrievedTask)
+            normalizedTask["new"] = True if listName in self.newTaskLists else False
+            normalizedTasks.append(normalizedTask)
+        logger.info(f"{self} tasks retrieved.")
+        logger.debug(f"Retrieved tasks: {normalizedTasks}")
+        return normalizedTasks
 
     def create_task(self, task: Task, listName: str):
         """
@@ -367,72 +418,130 @@ class Platform:
             (bool): If the operation was successful
         """
         listId = self.lists[listName]
-        # Check if ID already exists
-        if self.get_task(task)[1]:
+        # Check if any IDs already exist
+        if self.check_if_task_exists(task, listName):
             raise Exception(f'Task "{task}" already exists in {self}')
         taskToCreate = self._convert_task_to_platform(task)
-        url, params = self._get_url_create_task({"listId": listId})
+        url, reqType, params = self._get_url_create_task({"listId": listId})
         try:
-            response = self._send_request(url, "POST", params, taskToCreate)
+            response = self._send_request(url, reqType, params, taskToCreate)
         except:
             raise Exception(f"Error creating {self} task.")
-        return True
+        logger.info(f"{self} task created.")
+        logger.debug(f"Created task: {task}")
+        return response
 
-    def update_task(self, task: Task, taskDiffs=None, reqType="PUT"):
+    def update_task(self, task: Task, propertyDiffs: dict = None):
         """
         Update the properties of an existing task on the platform's API.
         Arguments:
             task (Task): A task with the updated properties to be uploaded.
-            taskDiffs (Task, default=None): A task which ONLY contains new properties.
+            propertyDiffs (dict, default=None): A dictionary which ONLY contains new task properties.
         Returns:
             (bool): If the operation was successful
         """
-        taskId = task[f"{self.name}_id"]
-        retrievedTask, taskExists = self.get_task(task)[1]
+        taskId = task.ids[f"{self.name}"]
+        retrievedTask, taskExists = self.get_task(task)
         if not taskExists:
             raise Exception(f"error getting {task} from {self}")
-        if taskDiffs == None:
-            # get a task objects with properties that have changed. Others are empty.
-            taskDiffs = task - retrievedTask
-        platformTaskUpdate = self._convert_task_to_platform(taskDiffs)
-        url, params = self._get_url_update_task({"taskId": taskId})
+        if propertyDiffs == None:
+            # get a properties dict with properties that have changed. Others are empty.
+            propertyDiffs = (task - retrievedTask).properties
+        # Create new task object with property changes and taskID. Lists and completed booleans are not included.
+        taskUpdate = Task(properties=propertyDiffs, ids=retrievedTask.ids)
+        platformTaskUpdate = self._convert_task_to_platform(taskUpdate)
+        url, reqType, params = self._get_url_update_task({"taskId": taskId})
         try:
             response = self._send_request(url, reqType, params, platformTaskUpdate)
         except:
-            raise Exception(f"Error updating {self} task with details: {taskDiffs}")
+            raise Exception(f"Error updating {self} task with details: {propertyDiffs}")
+        logger.info(f"{self} task updated.")
+        logger.debug(f"Updated task: {task}")
         return True
 
-    def complete_task(self, task: Task, reqType="POST"):
+    def complete_task(self, task: Task):
         """
         Mark an existing task as complete on the platform's API.
         Arguments:
-            task (Task): A task with the updated properties to be uploaded.
-            reqType (str, default="POST"): Change the http request type for the API call.
-                Default is POST but some platforms may require PUT.
+            task (Task): A task to be marked complete.
         Returns:
             (bool): If the operation was successful
         """
-        taskId = task[f"{self.name}_id"]
-        if (
-            "completed" in self.get_task(task)
-            and self.get_task(task)["completed"] == True
-        ):
+        taskId = task.ids[f"{self.name}"]
+        retrievedTask, taskExists = self.get_task(task)
+        if retrievedTask.completed[f"{self}"]:
             raise Exception(f"{self} task already complete")
 
-        url, params = self._get_url_complete_task({"taskId": taskId})
+        url, reqType, params = self._get_url_complete_task({"taskId": taskId})
         try:
             response = self._send_request(url, reqType, params)
         except:
             raise Exception(f"Error completing {self} task.")
+        logger.info(f"{self} task completed.")
+        logger.debug(f"Completed task: {task}")
         return True
 
+    def delete_task(self, task: Task):
+        """
+        Mark an existing task as complete on the platform's API.
+        Arguments:
+            task (Task): A task to be marked complete.
+        Returns:
+            (bool): If the operation was successful
+        """
+        taskId = task.ids[f"{self.name}"]
+        retrievedTask, taskExists = self.get_task(task)
+        if retrievedTask.completed[f"{self}"]:
+            raise Exception(f"{self} task already complete")
 
-# def check_if_task_exists(self, task, id_key="id", listName=None):
-#         retrieved_tasks = self.get_tasks(listName)
-#         for retrieved_task in retrieved_tasks:
-#             for platform, platformId in task.ids.items():
-#                 if str(retrieved_task[id_key]) == platformId:
-#                     logger.info(
-#                         f"{platform} ID exists in {self} for task {task}."
-#                     )
-#                     return True, retrieved_task[id_key]
+        url, reqType, params = self._get_url_delete_task({"taskId": taskId})
+        try:
+            response = self._send_request(url, reqType, params)
+        except:
+            raise Exception(f"Error deleting {self} task.")
+        logger.info(f"{self} task deleted.")
+        logger.debug(f"Deleted task: {task}")
+        return True
+
+    def check_if_task_exists(
+        self, task: Task, listName: str = None
+    ) -> tuple[bool, str]:
+        # TODO add docstring and logging
+        """Doesn't currently check closed tasks"""
+        retrievedTasks = self.get_tasks(listName)
+        for retrievedTask in retrievedTasks:
+            for platformName, platformId in task.ids.items():
+                if (
+                    platformName in retrievedTask.ids
+                    and retrievedTask.ids[platformName] == platformId
+                ):
+                    logger.info(f"{platformName} ID exists in {self} for task {task}.")
+                    return True, retrievedTask.ids[platformName]
+                else:
+                    return False
+
+    def auth_init(self, request):
+        return "<a href='" + self.authURL + "'>Click to authorize</a>"
+
+    def auth_callback(self, request, **kwargs):
+        """Callback function for OAuth flow"""
+        if request.args.get("error"):
+            return request.args.get("error")
+
+        reqType = kwargs["reqtype"] if "reqtype" in kwargs else "POST"
+        params = (
+            kwargs["params"]
+            if "params" in kwargs
+            else {
+                "client_id": self.clientId,
+                "client_secret": self.secret,
+                "code": request.args.get("code"),
+            }
+        )
+        data = kwargs["data"] if "data" in kwargs else {}
+        response = self._send_request(self.callbackURL, reqType, params, data, False)
+        return (
+            response["access_token"]
+            if "access_token" in response
+            else response["error"]
+        )

@@ -1,7 +1,6 @@
 import os
 import base64
 import hmac
-import hashlib
 from task import Task, Platform
 import uuid
 import logging
@@ -16,7 +15,7 @@ logger = logging.getLogger("gunicorn.error")
 # TODO review these time funcs
 def convert_time_from(s):
     """
-    Converts a RFC3339 datestamp or timestamp into Epoch time for standardization
+    Converts a RFC3339 datestamp or timestamp into Epoch time (ms) for standardization
     """
     if "T" in s:
         format = "%Y-%m-%dT%H:%M:%S"
@@ -28,7 +27,7 @@ def convert_time_from(s):
         date = datetime.datetime.strptime(s, format)
         date = date.replace(tzinfo=tz.gettz("Europe/London"))
         date = date.astimezone(tz.gettz("UTC"))
-        epochTime = time.mktime(date.timetuple()) * 1000
+        epochTime = time.mktime(date.timetuple()) * 1000  # into millisecs
     except ValueError:
         epochTime = None
     return epochTime, timeIncluded
@@ -36,14 +35,14 @@ def convert_time_from(s):
 
 def convert_time_to(epochTime, timeIncluded=None):
     """
-    Converts an epoch timestamp into RFC3339 for Todoist
+    Converts an epoch timestamp (ms) into RFC3339 for Todoist
     """
     # /1000 to get seconds
     dt = datetime.datetime.fromtimestamp(int(epochTime) / 1000)
     dt = dt.replace(tzinfo=tz.gettz("UTC"))
     dt = dt.astimezone(tz.gettz("Europe/London"))
 
-    # TODO change to use different due date key
+    # TODO move the 4am check to Clickup as this is a clickup feature
     if timeIncluded == False or (
         timeIncluded == None and dt.hour == 4 and dt.minute == 0
     ):
@@ -61,6 +60,8 @@ def convert_time_to(epochTime, timeIncluded=None):
 
 class Todoist(Platform):
     name = "todoist"
+    # TODO convert to V2
+    apiUrl = "https://api.todoist.com/rest/v1"
     accessToken = os.environ["TODOIST_ACCESS"]
     clientId = os.environ["TODOIST_CLIENT_ID"]
     secret = os.environ["TODOIST_SECRET"]
@@ -71,7 +72,7 @@ class Todoist(Platform):
         "food_log": "2291635541",
         "next_actions": "2284385839",
     }
-    new_task_lists = ["inbox", "alexa-todo"]
+    newTaskLists = ["inbox", "alexa-todo"]
     webhookEvents = {
         "item:added": "new_task",
         "item:completed": "task_complete",
@@ -86,44 +87,24 @@ class Todoist(Platform):
         "name": "content",
         "description": "description",
         "priority": "priority",
-        "due_date": "due_date",
+        # due date needs special attention
     }
     listIdMapping = "project_id"
     taskIdMapping = "id"
     taskCompleteMapping = "checked"
 
     state = os.environ["TODOIST_STATE"]
-    authLink = (
+    authURL = (
         "https://todoist.com/oauth/authorize?client_id="
         + clientId
         + "&scope=data:read_write,data:delete"
         + "&state="
         + state
     )
+    callbackURL = "https://todoist.com/oauth/access_token"
 
     def __init__(self):
         """"""
-
-    def auth_init(self, request):
-        return "<a href='" + self.authLink + "'>Click to authorize</a>"
-
-    def auth_callback(self, request):
-        if request.args.get("error"):
-            return request.args.get("error")
-        if request.args.get("state") != self.state:
-            return "Invalid state"
-
-        params = {
-            "client_id": self.clientId,
-            "client_secret": self.secret,
-            "code": request.args.get("code"),
-        }
-        response = helpers.send_request(
-            "https://todoist.com/oauth/access_token", {}, params
-        )
-        return (
-            response["access_token"] if response["access_token"] else response["error"]
-        )
 
     def _digest_hmac(self, hmac: hmac.HMAC):
         return base64.b64encode(hmac.digest()).decode("utf-8")
@@ -140,16 +121,56 @@ class Todoist(Platform):
     def _get_task_from_webhook(self, data):
         return data["event_data"]
 
-    def check_request(self, request):
-        if request.headers["User-Agent"] != "Todoist-Webhooks":
-            return {"error": "Bad user agent"}
-        return super().check_request(request)
+    def _get_url_get_task(self, params):
+        return f"/tasks/{params['taskId']}", "GET", {}
 
-    def _send_request(self, apiLocation, reqType="GET", params=..., data=...):
-        return super()._send_request(apiLocation, reqType, params, data)
+    def _get_url_get_tasks(self, params):
+        return "/tasks", "GET", {"project_id": params["listId"]}
 
-    def convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
-        task = super().convert_task_from_platform(platformTask, new)
+    def _get_url_create_task(self, params):
+        # listId is given in task data object
+        return f"/tasks", "POST", {}
+
+    def _get_url_update_task(self, params):
+        return f"/tasks/{params['taskId']}", "POST", {}
+
+    def _get_url_complete_task(self, params):
+        return f"/tasks/{params['taskId']}/close", "POST", {}
+
+    def _get_url_delete_task(self, params):
+        return f"/tasks/{params['taskId']}", "DELETE", {}
+
+    def _send_request(self, url, reqType="GET", params={}, data={}, useApiUrl=True):
+        return super()._send_request(url, reqType, params, data, useApiUrl)
+
+    def _convert_task_to_platform(self, task: Task, new: bool = False) -> dict:
+        platformTask = super()._convert_task_to_platform(task, new)
+
+        if "clickup" in task.ids:
+            platformTask["description"] = task.ids["clickup"]
+
+        if task["due_date"] is not None:
+            due, timeIncluded = convert_time_to(
+                task.properties["due_date"], task.dueTimeIncluded
+            )
+            if timeIncluded:
+                platformTask["due_datetime"] = due
+            else:
+                platformTask["due_date"] = due
+
+        if "priority" in platformTask:
+            platformTask["priority"] = 5 - platformTask["priority"]
+
+        if f"{self}" in task.lists:
+            platformTask["project_id"] = self.lists[task.lists[f"{self}"]]
+
+        logger.info(f"Task converted to {self}")
+        logger.debug(f"Converted task: {platformTask}")
+        return platformTask
+
+    def _convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
+        # These keys for the sync API (webhooks). REST API (get_task) uses different!
+        task = super()._convert_task_from_platform(platformTask, new)
 
         # Sets the priority of new tasks to 2 so that 1 is lower than "normal".
         if new and task.properties["priority"] == 1:
@@ -158,121 +179,62 @@ class Todoist(Platform):
         task.properties["priority"] = 5 - task.properties["priority"]
 
         # Description in next actions list tasks used to store Clickup ID
-        if task.fromList == self.lists["next_actions"] and task.properties[
+        if task.lists[f"{self}"] == self.lists["next_actions"] and task.properties[
             "description"
         ] not in [None, ""]:
             task.ids["clickup_id"] = task.properties["description"]
             task.properties["description"] = ""
 
         if "due" in platformTask and platformTask["due"] is not None:
-            (task.properties["due_date"]) = convert_time_from(
+            task.properties["due_date"], task.dueTimeIncluded = convert_time_from(
                 platformTask["due"]["date"]
             )
 
+        logger.info(f"Task converted from {self}")
+        logger.debug(f"Converted task: {task}")
         return task
 
-    # FIXME Checked up to here !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    def check_request(self, request):
+        if request.headers["User-Agent"] != "Todoist-Webhooks":
+            raise Exception("Bad user agent")
+        return super().check_request(request)
 
-    def get_tasks(self, project):
-        projectId = self.projects[project]
-        projectTasks = self._send_request(f"/tasks?project_id={projectId}", "GET")
-        for projectTask in projectTasks:
-            projectTask["new"] = True if project in self.new_task_projects else False
-        todoistTasks = [
-            self._normalize_task(projectTask) for projectTask in projectTasks
-        ]
-        return todoistTasks
+    def get_task(self, task: Task, normalized=True) -> tuple[Task, bool]:
+        task = super().get_task(task, normalized)
+        return task
 
-    def _convert_task(self, task, project=""):
-        todoistTask = {}
-        if "name" in task:
-            todoistTask["content"] = task["name"]
-        if "clickup_id" in task:
-            todoistTask["description"] = task["clickup_id"]
-            # Change if non-clickup tasks are added.
-        if "due_date" in task and task["due_date"] is not None:
-            due_time_included = (
-                task["due_time_included"] if "due_time_included" in task else None
-            )
-            dt, due_time_included = convert_time_to(task["due_date"], due_time_included)
-            if due_time_included:
-                todoistTask["due_datetime"] = dt
-            else:
-                todoistTask["due_date"] = dt
+    def get_tasks(self, listName: str = None, normalized=True) -> list[Task]:
+        tasks = super().get_tasks(listName, normalized)
+        return tasks
 
-        if project != "":
-            todoistTask["project_id"] = self.projects[project]
-            todoistTask["list"] = project
-        if "priority" in task:
-            todoistTask["priority"] = 5 - task["priority"]
-        logger.debug(todoistTask)
-        return todoistTask
+    def create_task(self, task: Task, listName: str):
+        response = super().create_task(task, listName)
+        task["todoist_id"] = response["id"]
 
-    def create_task(self, task, project):
-        projectId = self.projects[project]
-        # Check if ID already exists
-        if "clickup_id" in task:
-            projectTasks = self._send_request(f"/tasks?project_id={projectId}", "GET")
-            for projectTask in projectTasks:
-                if str(projectTask["description"]) == str(task["clickup_id"]):
-                    raise Exception("Clickup ID already exists in Todoist project.")
+        return task
 
-        todoistTask = self._convert_task(task, project)
-        response = self._send_request("/tasks", "POST", todoistTask)
-        return {"todoist_id": response["id"], **response}
-
-    def complete_task(self, task):
-        taskId = task["todoist_id"]
-        try:
-            response = self._send_request(f"/tasks/{taskId}")
-            if response["completed"] == True:
-                raise Exception
-        except Exception:
-            raise Exception("Todoist task already complete")
-
-        response = self._send_request(f"/tasks/{taskId}/close", "POST")
+    def update_task(self, task: Task, propertyDiffs: dict = None):
+        response = super().update_task(task, propertyDiffs)
         return response
 
-    # TODO rename? Now returns task as well.
-    def check_if_task_exists(self, task):
-        logger.info("checking if Todoist task exists")
-        if "todoist_id" not in task:
-            logger.debug("No todoist Id.")
-            return False, {}
-        try:
-            response = self._send_request(f"/tasks/{task['todoist_id']}")
-        except:
-            logger.debug("Error retrieving task.")
-            return False, {}
-        if response is None or response == {} or response == "":
-            logger.debug("No task found.")
-            return False, {}
-        todoistTask = self._normalize_task(response)
-        if response["completed"] == True:
-            logger.debug("Todoist task already complete")
-            return False, todoistTask
-        logger.debug("Todoist task exists.")
-        return True, todoistTask
-
-    def update_task(self, task):
-        taskId = task["todoist_id"]
-        if not self.check_if_task_exists(task)[0]:
-            return False
-        taskUpdates = task["updates"] if "updates" in task else task
-        todoistTask = self._convert_task(taskUpdates)
-        if todoistTask == {}:
-            raise Exception("Nothing to update in Todoist Task.")
-        response = self._send_request(f"/tasks/{taskId}", "POST", todoistTask)
+    def complete_task(self, task: Task):
+        response = super().complete_task(task)
         return response
 
-    def delete_task(self, task):
-        taskId = task["todoist_id"]
-        try:
-            response = self._send_request(f"/tasks/{taskId}")
-            if response["completed"] == True:
-                raise Exception
-        except Exception:
-            raise Exception("Todoist task already complete")
-
-        response = self._send_request(f"/tasks/{taskId}", "DELETE")
+    def delete_task(self, task: Task):
+        response = super().delete_task(task)
         return response
+
+    def check_if_task_exists(
+        self, task: Task, listName: str = None
+    ) -> tuple[bool, str]:
+        return super().check_if_task_exists(task, listName)
+
+    def auth_init(self, request):
+        return super().auth_init(request)
+
+    def auth_callback(self, request, **kwargs):
+        if request.args.get("state") != self.state:
+            return "Invalid state"
+
+        return super().auth_callback(request)
