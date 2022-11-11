@@ -5,7 +5,7 @@ import time
 logger = logging.getLogger("gunicorn.error")
 
 
-def max_days_diff(dateIn, days):
+def max_days_future(dateIn, days):
     """Check if a date is within a number of days from today.
     Returns TRUE or FALSE."""
     cutoff = int((time.time() + days * 86400) * 1000)

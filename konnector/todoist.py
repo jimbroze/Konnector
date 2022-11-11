@@ -1,13 +1,13 @@
 import os
 import base64
 import hmac
-from task import Task, Platform
 import uuid
 import logging
 import time, datetime
 from dateutil import tz
 
-import app.helpers as helpers
+from konnector.task import Task, Platform
+import konnector.helpers as helpers
 
 logger = logging.getLogger("gunicorn.error")
 
@@ -89,11 +89,11 @@ class Todoist(Platform):
         "priority": "priority",
         # due date needs special attention
     }
-    listIdMapping = "project_id"
-    taskIdMapping = "id"
-    taskCompleteMapping = "checked"
+    appEndpoint = ""
+    platformEndpoint = ""
 
     state = os.environ["TODOIST_STATE"]
+
     authURL = (
         "https://todoist.com/oauth/authorize?client_id="
         + clientId
@@ -103,8 +103,8 @@ class Todoist(Platform):
     )
     callbackURL = "https://todoist.com/oauth/access_token"
 
-    def __init__(self):
-        """"""
+    def __init__(self, appEndpoint, platformEndpoint):
+        super().__init__(appEndpoint, platformEndpoint)
 
     def _digest_hmac(self, hmac: hmac.HMAC):
         return base64.b64encode(hmac.digest()).decode("utf-8")
@@ -119,7 +119,20 @@ class Todoist(Platform):
         return super()._get_check_event_from_webhook(data["event_name"])
 
     def _get_task_from_webhook(self, data):
+        # No need to fetch task data as provided in webhook.
+        # "get_task" would not work for completed tasks.
         return data["event_data"]
+
+    def _get_id_from_task(self, data):
+        return data["id"]
+
+    def _get_list_id_from_task(self, data):
+        return data["project_id"]
+
+    def _get_complete_from_task(self, data):
+        # Sync API uses "checked". REST uses "is_completed".
+        # All other relevant properties are identical.
+        return data["checked"] if "checked" in data else data["is_completed"]
 
     def _get_url_get_task(self, params):
         return f"/tasks/{params['taskId']}", "GET", {}
@@ -199,8 +212,8 @@ class Todoist(Platform):
             raise Exception("Bad user agent")
         return super().check_request(request)
 
-    def get_task(self, task: Task, normalized=True) -> tuple[Task, bool]:
-        task = super().get_task(task, normalized)
+    def get_task(self, task: Task, normalized=True, taskId=None) -> tuple[Task, bool]:
+        task = super().get_task(task, normalized, taskId)
         return task
 
     def get_tasks(self, listName: str = None, normalized=True) -> list[Task]:
@@ -209,7 +222,7 @@ class Todoist(Platform):
 
     def create_task(self, task: Task, listName: str):
         response = super().create_task(task, listName)
-        task["todoist_id"] = response["id"]
+        task.ids["todoist"] = self._get_id_from_task(response)
 
         return task
 

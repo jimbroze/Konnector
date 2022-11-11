@@ -86,19 +86,8 @@ class Task:
         )
         return newTask
 
-    def _get_prop_differences(self, oldTask: Task, newTask: Task = None) -> dict:
-        """
-        Returns a dictionary of properties that are in a new task but not old.
-        All other properties are set to default.
-        """
-        if newTask == None:
-            newTask = self
-        newProps = newTask.properties
-        oldProps = oldTask.properties
-        return {
-            k: (newProps[k] if newProps[k] != oldProps[k] else Task.properties[k])
-            for k in newProps
-        }
+    def add_id(self, platform: str, id: str):
+        self.ids[platform] = id
 
 
 class Platform:
@@ -125,14 +114,15 @@ class Platform:
         "priority": "priority",
         "due_date": "due_date",
     }
-    listIdMapping = "list_id"
-    taskIdMapping = "id"
-    taskCompleteMapping = "completed"
+    appEndpoint = ""
+    platformEndpoint = ""
     authURL = ""
     callbackURL = ""
 
-    def __init__():
+    def __init__(self, appEndpoint, platformEndpoint):
         """initalise a platfom"""
+        self.appEndpoint = appEndpoint
+        self.platformEndpoint = platformEndpoint
 
     def __str__(self):
         return f"{self.name}"
@@ -174,6 +164,15 @@ class Platform:
 
     def _get_task_from_webhook(self, data):
         return data
+
+    def _get_id_from_task(self, data):
+        return data["id"]
+
+    def _get_list_id_from_task(self, data):
+        return data["list_id"]
+
+    def _get_complete_from_task(self, data):
+        return data["completed"]
 
     def _get_url_get_task(self, params):
         """
@@ -288,17 +287,17 @@ class Platform:
                 taskProps[propName] = platformTask[platformPropName]
 
         lists = {
-            f"{self}": reverse_lookup(platformTask[self.listIdMapping], self.lists)
-        }
-        # TODO does this correctly give boolean?
-        completed = {
-            f"{self}": (
-                platformTask[self.taskCompleteMapping]
-                if self.taskCompleteMapping in platformTask
-                else None
+            f"{self}": reverse_lookup(
+                self._get_list_id_from_task(platformTask), self.lists
             )
         }
-        ids = {f"{self}": platformTask[self.taskIdMapping]}
+        # TODO does this correctly give boolean?
+        try:
+            platformCompleted = self._get_complete_from_task(platformTask)
+        except:
+            platformCompleted = None
+        completed = {f"{self}": platformCompleted}
+        ids = {f"{self}": self._get_id_from_task(platformTask)}
 
         return Task(
             properties=taskProps,
@@ -344,31 +343,31 @@ class Platform:
         normalizedTask = self._convert_task_from_platform(task, new)
         logger.debug(f"Normalized {self} webhook task: {normalizedTask}")
 
-        return {"event": event, "listName": listName}, normalizedTask
+        return event, listName, normalizedTask, data
 
-    def get_task(self, task: Task, normalized=True) -> tuple[Task, bool]:
+    def get_task(self, task: Task, normalized=True, taskId=None) -> tuple[Task, bool]:
         """
         Retrieve a specific task from the platform's API.
         Arguments:
             task (Task): An object containing the task ID to be fetched from the API
             normalized (bool, default=True):
                 If the tasks should be returned as Task objects
-                TODO should they always be task objects??
         Returns:
             (Task): The task retrieved and processed
             (bool): If the task exists and was retrieved
         """
 
         logger.debug(f"Getting {self} task")
-        if f"{self.name}" not in task:
-            logger.debug(f"{self.name} ID does not exist in the task: {task}")
-            return {}, False
-        taskId = task.ids[f"{self}"]
+        if taskId is None:
+            if f"{self.name}" not in task.ids:
+                logger.debug(f"{self.name} ID does not exist in the task: {task}")
+                return {}, False
+            taskId = task.ids[f"{self}"]
         url, reqType, params = self._get_url_get_task({"taskId": taskId})
         try:
             retrieved_task = self._send_request(url, reqType, params)
         except:
-            logger.debug(f"Error retrieving task {task} from {self}")
+            logger.debug(f"Error retrieving task with ID {taskId} from {self}")
             return {}, False
         outTask = (
             self._convert_task_from_platform(retrieved_task)
@@ -508,6 +507,12 @@ class Platform:
     ) -> tuple[bool, str]:
         # TODO add docstring and logging
         """Doesn't currently check closed tasks"""
+        # Check if longest id = 0
+        noIdsExist = (
+            len(max(task.ids.values(), key=len) if task.ids.values() else "") == 0
+        )
+        if noIdsExist:
+            return False
         retrievedTasks = self.get_tasks(listName)
         for retrievedTask in retrievedTasks:
             for platformName, platformId in task.ids.items():
@@ -519,6 +524,10 @@ class Platform:
                     return True, retrievedTask.ids[platformName]
                 else:
                     return False
+
+    def add_id(self, task: Task, platform: str, id: str):
+        # TODO
+        task.add_id(platform, id)
 
     def auth_init(self, request):
         return "<a href='" + self.authURL + "'>Click to authorize</a>"

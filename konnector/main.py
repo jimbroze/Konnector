@@ -5,22 +5,23 @@ from dotenv import load_dotenv
 import time
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
+
 # from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
 load_dotenv()
 
-from app.todoist import Todoist
-from app.clickup import Clickup
-import app.helpers as helpers
+from konnector.todoist import Todoist
+from konnector.clickup import Clickup
+import konnector.helpers as helpers
+
+todoistEndpoint = "/todoist/webhook"
+clickupEndpoint = "/clickup/webhook/call"
 
 AUTH = os.getenv("AUTH", "False").lower() in ("true", "1")
 ENDPOINT = os.environ["ENDPOINT"]
-clickupEndpointQuery = "/clickup/webhook/call"
-
 app = Flask(__name__)
-todoist = Todoist()
-clickupEndpoint = ENDPOINT + clickupEndpointQuery
-clickup = Clickup(clickupEndpoint)
+todoist = Todoist(ENDPOINT, todoistEndpoint)
+clickup = Clickup(ENDPOINT, clickupEndpoint)
 
 logger = logging.getLogger("gunicorn.error")
 
@@ -28,6 +29,14 @@ if __name__ == "__main__":
     app.logger.handlers = logger.handlers
     # Level set by gunicorn
     app.logger.setLevel(logger.level)
+
+
+def next_actions_criteria(clickupTask):
+    return clickupTask["status"] == "next action" and (
+        clickupTask["priority"] < 3
+        or helpers.max_days_future(clickupTask["due_date"], days=3)
+        or not clickup.is_subtask(clickupTask)
+    )
 
 
 @app.route("/")
@@ -85,36 +94,36 @@ def todoist_webhook():
         IN_LIST = Todoist:next_action
     """
     try:
-        todoistRequest, todoistTask = todoist.check_request(request)
+        todoistEvent, todoistList, todoistTask, todoistTaskData = todoist.check_request(
+            request
+        )
         inputData = {
             "platform": todoist,
-            "list": todoistRequest["list"],
+            "list": todoistList,
             "task": todoistTask,
         }
         outputData = {"platform": clickup}
-        if todoistRequest["event"] == "new_task":
-            if todoistRequest["list"] in todoist.new_task_projects:
+        if todoistEvent == "new_task":
+            if todoistList in todoist.new_task_projects:
                 outputData["list"] = "inbox"
-            elif todoistRequest["list"] == "food_log":
+            elif todoistList == "food_log":
                 outputData["list"] = "food_log"
             else:
-                raise Exception(
-                    f"Invalid Todoist list for new task: {todoistRequest['list']}"
-                )
+                raise Exception(f"Invalid Todoist list for new task: {todoistList}")
             clickupTask = move_task(inputData, outputData, deleteTask=True)
-        elif todoistRequest["event"] in [
+        elif todoistEvent in [
             "task_complete",
             "task_updated",
             "task_removed",
         ]:
-            clickupTask = modify_task(inputData, outputData, todoistRequest["event"])
+            clickupTask = modify_task(inputData, outputData, todoistEvent)
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logger.warning(f"Error in processing Todoist webhook: {e}")
         return make_response(repr(e), 202)
 
 
-@app.route(clickupEndpointQuery, methods=["POST"])
+@app.route(clickupEndpoint, methods=["POST"])
 def clickup_webhook_received():
     """
     Process Clickup Webhooks.
@@ -136,48 +145,44 @@ def clickup_webhook_received():
           IF task exists in Todoist:next_actions list THEN update Todoist task
     """
     try:
-        clickupRequest = clickup.check_request(request)
-        clickupTask = clickup.get_task(clickupRequest["data"])
+        (
+            clickupEvent,
+            clickupList,
+            clickupTask,
+            clickupEventData,
+        ) = clickup.check_request(request)
         inputData = {
             "platform": clickup,
-            "list": clickupRequest["list"],
+            "list": clickupList,
             "task": clickupTask,
         }
         outputData = {"platform": todoist}
         todoistTaskExists, todoistTask = todoist.check_if_task_exists(clickupTask)
 
-        if clickupRequest["event"] in ["task_updated"]:
+        if clickupEvent in ["task_updated"]:
             # Clickup task into todoist next_actions.
             # Next action status AND (high priority OR due date < 1 week OR no project.)
-            if clickupTask["status"] == "next action" and (
-                clickupTask["priority"] < 3
-                or helpers.max_days_diff(clickupTask["due_date"], days=3)
-                or not clickup.is_subtask(clickupTask)
-            ):
+            if next_actions_criteria(clickupTask):
                 outputData["list"] = "next_actions"
                 if not todoistTaskExists:
                     logger.info(f"Adding task to next actions list.")
                     todoistTask = move_task(inputData, outputData, deleteTask=False)
-                    clickup.add_todoist_id(clickupTask, todoistTask["todoist_id"])
+                    clickup.add_id(clickupTask, "todoist", todoistTask.ids["todoist"])
                 else:
                     logger.info(f"Task is already in next actions list.")
-                    todoistTask = modify_task(
-                        inputData, outputData, clickupRequest["event"]
-                    )
+                    todoistTask = modify_task(inputData, outputData, clickupEvent)
             elif todoistTaskExists and todoistTask["list"] == "next_actions":
                 logger.info(f"Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
-
-        # Update Clickup task in Todoist
         elif (
-            clickupRequest["event"]
+            clickupEvent
             in [
                 "task_complete",
                 "task_removed",
             ]
             and todoistTaskExists
         ):
-            todoistTask = modify_task(inputData, outputData, clickupRequest["event"])
+            todoistTask = modify_task(inputData, outputData, clickupEvent)
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logger.warning(f"Error in processing clickup webhook: {e}")
