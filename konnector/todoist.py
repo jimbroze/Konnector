@@ -1,13 +1,14 @@
+from konnector.task import Task, Platform
+
 import os
 import base64
 import hmac
 import uuid
 import logging
-import time, datetime
+import time
+import datetime
 from dateutil import tz
 
-from konnector.task import Task, Platform
-import konnector.helpers as helpers
 
 logger = logging.getLogger("gunicorn.error")
 
@@ -43,8 +44,8 @@ def convert_time_to(epochTime, timeIncluded=None):
     dt = dt.astimezone(tz.gettz("Europe/London"))
 
     # TODO move the 4am check to Clickup as this is a clickup feature
-    if timeIncluded == False or (
-        timeIncluded == None and dt.hour == 4 and dt.minute == 0
+    if timeIncluded is False or (
+        timeIncluded is None and dt.hour == 4 and dt.minute == 0
     ):
         # Remove time.
         timeIncluded = False
@@ -142,7 +143,7 @@ class Todoist(Platform):
 
     def _get_url_create_task(self, params):
         # listId is given in task data object
-        return f"/tasks", "POST", {}
+        return "/tasks", "POST", {}
 
     def _get_url_update_task(self, params):
         return f"/tasks/{params['taskId']}", "POST", {}
@@ -199,9 +200,10 @@ class Todoist(Platform):
             task.properties["description"] = ""
 
         if "due" in platformTask and platformTask["due"] is not None:
-            task.properties["due_date"], task.dueTimeIncluded = convert_time_from(
-                platformTask["due"]["date"]
-            )
+            (
+                task.properties["due_date"],
+                task.dueTimeIncluded,
+            ) = convert_time_from(platformTask["due"]["date"])
 
         logger.info(f"Task converted from {self}")
         logger.debug(f"Converted task: {task}")

@@ -6,4 +6,6 @@ before_install:
 install:
   - poetry install
 script:
+  - poetry run black --experimental-string-processing
+  - poetry run flake8 --max-line-length=88 --extend-ignore=E203
   - poetry run pytest

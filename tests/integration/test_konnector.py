@@ -1,7 +1,3 @@
-from konnector.main import app
-from tests.conftest import test_client
-
-
 def test_home_page(test_client):
     """
     GIVEN a Flask application configured for testing

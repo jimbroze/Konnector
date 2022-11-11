@@ -1,7 +1,7 @@
 import pytest
 import time
 
-from konnector.task import Task, Platform
+from konnector.task import Task
 from konnector.main import app
 
 

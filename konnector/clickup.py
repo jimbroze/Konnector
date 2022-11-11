@@ -1,10 +1,8 @@
+from konnector.task import Task, Platform
+
 import os
 import hmac
-import hashlib
 import logging
-
-from konnector.task import Task, Platform
-import konnector.helpers as helpers
 
 logger = logging.getLogger("gunicorn.error")
 
@@ -99,7 +97,7 @@ class Clickup(Platform):
         if task["due_date"] is not None:
             platformTask["due_date_time"] = task.dueTimeIncluded
 
-        if new == True and "todoist" in task.ids:
+        if new is True and "todoist" in task.ids:
             platformTask["assignees"] = [self.userIds[0]]
             platformTask["custom_fields"] = [
                 {

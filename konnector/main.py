@@ -1,8 +1,11 @@
+from konnector.todoist import Todoist
+from konnector.clickup import Clickup
+import konnector.helpers as helpers
+
 from flask import Flask, request, jsonify, make_response  # render_template
 import logging
 import os
 from dotenv import load_dotenv
-import time
 import atexit
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -10,9 +13,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 load_dotenv()
 
-from konnector.todoist import Todoist
-from konnector.clickup import Clickup
-import konnector.helpers as helpers
 
 todoistEndpoint = "/todoist/webhook"
 clickupEndpoint = "/clickup/webhook/call"
@@ -55,7 +55,7 @@ def home():
 # @app.route('/auth/init/<appname>')
 # def auth():
 #   return render_template('form.html', appname=appname)
-if AUTH == True:
+if AUTH is True:
 
     @app.route("/todoist/auth")
     def todoist_auth():
@@ -94,9 +94,12 @@ def todoist_webhook():
         IN_LIST = Todoist:next_action
     """
     try:
-        todoistEvent, todoistList, todoistTask, todoistTaskData = todoist.check_request(
-            request
-        )
+        (
+            todoistEvent,
+            todoistList,
+            todoistTask,
+            todoistTaskData,
+        ) = todoist.check_request(request)
         inputData = {
             "platform": todoist,
             "list": todoistList,
@@ -110,13 +113,13 @@ def todoist_webhook():
                 outputData["list"] = "food_log"
             else:
                 raise Exception(f"Invalid Todoist list for new task: {todoistList}")
-            clickupTask = move_task(inputData, outputData, deleteTask=True)
+            move_task(inputData, outputData, deleteTask=True)
         elif todoistEvent in [
             "task_complete",
             "task_updated",
             "task_removed",
         ]:
-            clickupTask = modify_task(inputData, outputData, todoistEvent)
+            modify_task(inputData, outputData, todoistEvent)
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logger.warning(f"Error in processing Todoist webhook: {e}")
@@ -165,14 +168,14 @@ def clickup_webhook_received():
             if next_actions_criteria(clickupTask):
                 outputData["list"] = "next_actions"
                 if not todoistTaskExists:
-                    logger.info(f"Adding task to next actions list.")
+                    logger.info("Adding task to next actions list.")
                     todoistTask = move_task(inputData, outputData, deleteTask=False)
                     clickup.add_id(clickupTask, "todoist", todoistTask.ids["todoist"])
                 else:
-                    logger.info(f"Task is already in next actions list.")
+                    logger.info("Task is already in next actions list.")
                     todoistTask = modify_task(inputData, outputData, clickupEvent)
             elif todoistTaskExists and todoistTask["list"] == "next_actions":
-                logger.info(f"Removing task from next actions list.")
+                logger.info("Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
         elif (
             clickupEvent
@@ -204,7 +207,7 @@ def move_todoist_inbox():
                 "task": newTodoistTask,
             }
             outputData = {"platform": clickup, "list": "inbox"}
-            clickupTask = move_task(inputData, outputData, deleteTask=True)
+            move_task(inputData, outputData, deleteTask=True)
 
 
 # Schedule check of todoist inbox in case webhook hasn't worked.
@@ -236,11 +239,12 @@ def move_task(input, output, deleteTask: bool = False):
     inPlatformName = input["platform"].name
     outPlatformName = output["platform"].name
     logger.info(
-        f"Attempting to add new task from {inPlatformName}-{input['list']} to {outPlatformName}-{output['list']}"
+        f"Attempting to add new task from {inPlatformName}-{input['list']} to"
+        f" {outPlatformName}-{output['list']}"
     )
     outputTask = output["platform"].create_task(input["task"], output["list"])
     logger.info(f"Successfully added new task to {outPlatformName}.")
-    if deleteTask == True:
+    if deleteTask is True:
         logger.info(f"Attempting to delete new task from {inPlatformName}")
         # Possibly add option to remove task, without completing, in future?
         input["platform"].complete_task(input["task"])
@@ -252,7 +256,8 @@ def modify_task(input, output, event):
     inPlatformName = input["platform"].name
     outPlatformName = output["platform"].name
     logger.info(
-        f"Attempting to modify task from {inPlatformName} on {outPlatformName}.  Event: {event}"
+        f"Attempting to modify task from {inPlatformName} on {outPlatformName}."
+        f"  Event: {event}"
     )
     if not checkId(input["task"], outPlatformName):
         logger.debug(f"No valid id for {outPlatformName}.")
@@ -262,10 +267,11 @@ def modify_task(input, output, event):
         "task_updated": output["platform"].update_task,
         "task_removed": output["platform"].delete_task,
     }[event](input["task"])
-    if outputTask == False:
+    if outputTask is False:
         return False
     logger.info(
-        f"Successfully completed event: '{event}' from {inPlatformName} task to {outPlatformName} task"
+        f"Successfully completed event: '{event}' from {inPlatformName} task to"
+        f" {outPlatformName} task"
     )
     return outputTask
 

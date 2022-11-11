@@ -61,7 +61,8 @@ class Task:
 
     def __sub__(self, other: Task) -> Task:
         """
-        Returns a task with properties, lists and ids that are in the first task but not second.
+        Returns a task with properties, lists and ids that are in the
+        first task but not second.
         """
         propDiffs = {
             k: (
@@ -82,7 +83,10 @@ class Task:
         }
         idDiffs = {k: self.ids[k] for k in self.ids if self.ids[k] != other.ids[k]}
         newTask = Task(
-            properties=propDiffs, lists=listDiffs, completed=completedDiffs, ids=idDiffs
+            properties=propDiffs,
+            lists=listDiffs,
+            completed=completedDiffs,
+            ids=idDiffs,
         )
         return newTask
 
@@ -140,7 +144,8 @@ class Platform:
 
     def _get_check_list_from_webhook(self, listId):
         """
-        Check if the event that fired the webhook is recognised. Raise an exception otherwise.
+        Check if the event that fired the webhook is recognised.
+        Raise an exception otherwise.
         """
 
         if listId not in self.lists.values():
@@ -151,7 +156,8 @@ class Platform:
 
     def _get_check_event_from_webhook(self, platformEvent):
         """
-        Check if the event that fired the webhook is recognised. Raise an exception otherwise.
+        Check if the event that fired the webhook is recognised.
+        Raise an exception otherwise.
         """
 
         if platformEvent not in self.webhookEvents.values():
@@ -231,7 +237,7 @@ class Platform:
         """
         # queryParams = self._get_query_params(params)
         headers = self.headers
-        fullUrl = self.apiUrl + url if useApiUrl == True else url
+        fullUrl = self.apiUrl + url if useApiUrl is True else url
         try:
             if not data:
                 response = requests.request(
@@ -294,7 +300,7 @@ class Platform:
         # TODO does this correctly give boolean?
         try:
             platformCompleted = self._get_complete_from_task(platformTask)
-        except:
+        except (KeyError, IndexError, NameError, AttributeError):
             platformCompleted = None
         completed = {f"{self}": platformCompleted}
         ids = {f"{self}": self._get_id_from_task(platformTask)}
@@ -329,7 +335,7 @@ class Platform:
         )
         if request.headers[self.signatureKey] != calcHmac:
             raise Exception("Bad HMAC")
-        logger.debug(f"Headers check OK.")
+        logger.debug("Headers check OK.")
 
         data = request.get_json(force=True)
         logger.debug(f"Request data: {data}")
@@ -366,12 +372,14 @@ class Platform:
         url, reqType, params = self._get_url_get_task({"taskId": taskId})
         try:
             retrieved_task = self._send_request(url, reqType, params)
-        except:
-            logger.debug(f"Error retrieving task with ID {taskId} from {self}")
+        except requests.exceptions.RequestException as err:
+            raise Exception(
+                f"Error retrieving task with ID {taskId} from {self}: {err}"
+            )
             return {}, False
         outTask = (
             self._convert_task_from_platform(retrieved_task)
-            if normalized == True
+            if normalized is True
             else retrieved_task
         )
         logger.info(f"{self} task retrieved.")
@@ -393,10 +401,10 @@ class Platform:
         url, reqType, params = self._get_url_get_tasks({"listId": listId})
         try:
             retrievedTasks = self._send_request(url, reqType, params)
-        except:
-            raise Exception(f"Error getting tasks from {self}.")
+        except requests.exceptions.RequestException as err:
+            raise Exception(f"Error getting tasks from {self}: {err}")
 
-        if normalized == False:
+        if normalized is False:
             return retrievedTasks
         normalizedTasks = []
         for retrievedTask in retrievedTasks:
@@ -424,8 +432,8 @@ class Platform:
         url, reqType, params = self._get_url_create_task({"listId": listId})
         try:
             response = self._send_request(url, reqType, params, taskToCreate)
-        except:
-            raise Exception(f"Error creating {self} task.")
+        except requests.exceptions.RequestException as err:
+            raise Exception(f"Error creating {self} task: {err}")
         logger.info(f"{self} task created.")
         logger.debug(f"Created task: {task}")
         return response
@@ -435,7 +443,8 @@ class Platform:
         Update the properties of an existing task on the platform's API.
         Arguments:
             task (Task): A task with the updated properties to be uploaded.
-            propertyDiffs (dict, default=None): A dictionary which ONLY contains new task properties.
+            propertyDiffs (dict, default=None): A dictionary which ONLY
+            contains new task properties.
         Returns:
             (bool): If the operation was successful
         """
@@ -443,17 +452,20 @@ class Platform:
         retrievedTask, taskExists = self.get_task(task)
         if not taskExists:
             raise Exception(f"error getting {task} from {self}")
-        if propertyDiffs == None:
+        if propertyDiffs is None:
             # get a properties dict with properties that have changed. Others are empty.
             propertyDiffs = (task - retrievedTask).properties
-        # Create new task object with property changes and taskID. Lists and completed booleans are not included.
+        # Create new task object with property changes and taskID.
+        # Lists and completed booleans are not included.
         taskUpdate = Task(properties=propertyDiffs, ids=retrievedTask.ids)
         platformTaskUpdate = self._convert_task_to_platform(taskUpdate)
         url, reqType, params = self._get_url_update_task({"taskId": taskId})
         try:
-            response = self._send_request(url, reqType, params, platformTaskUpdate)
-        except:
-            raise Exception(f"Error updating {self} task with details: {propertyDiffs}")
+            self._send_request(url, reqType, params, platformTaskUpdate)
+        except requests.exceptions.RequestException as err:
+            raise Exception(
+                f"Error updating {self} task with details: {propertyDiffs}: {err}"
+            )
         logger.info(f"{self} task updated.")
         logger.debug(f"Updated task: {task}")
         return True
@@ -473,9 +485,9 @@ class Platform:
 
         url, reqType, params = self._get_url_complete_task({"taskId": taskId})
         try:
-            response = self._send_request(url, reqType, params)
-        except:
-            raise Exception(f"Error completing {self} task.")
+            self._send_request(url, reqType, params)
+        except requests.exceptions.RequestException as err:
+            raise Exception(f"Error completing {self} task: {err}")
         logger.info(f"{self} task completed.")
         logger.debug(f"Completed task: {task}")
         return True
@@ -495,9 +507,9 @@ class Platform:
 
         url, reqType, params = self._get_url_delete_task({"taskId": taskId})
         try:
-            response = self._send_request(url, reqType, params)
-        except:
-            raise Exception(f"Error deleting {self} task.")
+            self._send_request(url, reqType, params)
+        except requests.exceptions.RequestException as err:
+            raise Exception(f"Error deleting {self} task: {err}")
         logger.info(f"{self} task deleted.")
         logger.debug(f"Deleted task: {task}")
         return True
