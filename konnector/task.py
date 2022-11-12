@@ -8,11 +8,9 @@ logger = logging.getLogger("gunicorn.error")
 
 
 def reverse_lookup(lookupVal, dictionary: dict):
-    return (
-        next(
-            (key for key, value in dictionary if value == str(lookupVal)),
-            None,
-        ),
+    return next(
+        (key for key, value in dictionary.items() if value == str(lookupVal)),
+        None,
     )
 
 
@@ -172,7 +170,7 @@ class Platform:
         return data
 
     def _get_id_from_task(self, data):
-        return data["id"]
+        return str(data["id"])
 
     def _get_list_id_from_task(self, data):
         return data["list_id"]
@@ -257,7 +255,7 @@ class Platform:
             raise
         if "application/json" in response.headers.get("Content-Type"):
             logger.debug(f"Request response (JSON): {response.json()}")
-            return f"Request response: {response.json()}"
+            return response.json()
         else:
             logger.debug(f"Request response (text): {response.text}")
             return response.text
@@ -435,8 +433,10 @@ class Platform:
         except requests.exceptions.RequestException as err:
             raise Exception(f"Error creating {self} task: {err}")
         logger.info(f"{self} task created.")
-        logger.debug(f"Created task: {task}")
-        return response
+        logger.debug(f"Created task: {response}")
+        newTask = self._convert_task_from_platform(response)
+        logger.debug(f"Converted task: {newTask}")
+        return newTask
 
     def update_task(self, task: Task, propertyDiffs: dict = None):
         """

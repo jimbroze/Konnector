@@ -3,7 +3,9 @@ from konnector.task import Task, Platform
 import os
 import hmac
 import logging
+from dotenv import load_dotenv
 
+load_dotenv()
 logger = logging.getLogger("gunicorn.error")
 
 
@@ -61,7 +63,7 @@ class Clickup(Platform):
         return self.get_task(taskId=data["id"], normalized=False)
 
     def _get_id_from_task(self, data):
-        return data["id"]
+        return str(data["id"])
 
     def _get_list_id_from_task(self, data):
         return data["list"]["id"]
@@ -159,9 +161,7 @@ class Clickup(Platform):
         return tasks
 
     def create_task(self, task: Task, listName: str):
-        response = super().create_task(task, listName)
-        # TODO check if works for clickup. Add to parent class if so
-        task.ids["clickup"] = self._get_id_from_task(response)
+        task = super().create_task(task, listName)
         return task
 
     def update_task(self, task: Task, propertyDiffs: dict = None):

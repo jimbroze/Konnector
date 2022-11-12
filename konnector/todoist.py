@@ -8,8 +8,9 @@ import logging
 import time
 import datetime
 from dateutil import tz
+from dotenv import load_dotenv
 
-
+load_dotenv()
 logger = logging.getLogger("gunicorn.error")
 
 
@@ -83,12 +84,13 @@ class Todoist(Platform):
     headers = {
         "Authorization": "Bearer " + str(accessToken),
         "X-Request-Id": str(uuid.uuid4()),
+        "Content-Type": "application/json",
     }
     propertyMappings = {
         "name": "content",
         "description": "description",
         "priority": "priority",
-        # due date needs special attention
+        "due_date": "due_date",  # due date needs special attention
     }
     appEndpoint = ""
     platformEndpoint = ""
@@ -125,7 +127,7 @@ class Todoist(Platform):
         return data["event_data"]
 
     def _get_id_from_task(self, data):
-        return data["id"]
+        return str(data["id"])
 
     def _get_list_id_from_task(self, data):
         return data["project_id"]
@@ -163,15 +165,15 @@ class Todoist(Platform):
         if "clickup" in task.ids:
             platformTask["description"] = task.ids["clickup"]
 
-        if task["due_date"] is not None:
+        if task.properties["due_date"] is not None:
             due, timeIncluded = convert_time_to(
                 task.properties["due_date"], task.dueTimeIncluded
             )
             if timeIncluded:
-                platformTask["due_datetime"] = due
+                platformTask["due"] = {"due_datetime": due}
             else:
-                platformTask["due_date"] = due
-
+                platformTask["due"] = {"due_date": due}
+        platformTask.pop("due_date", None)
         if "priority" in platformTask:
             platformTask["priority"] = 5 - platformTask["priority"]
 
@@ -223,9 +225,7 @@ class Todoist(Platform):
         return tasks
 
     def create_task(self, task: Task, listName: str):
-        response = super().create_task(task, listName)
-        task.ids["todoist"] = self._get_id_from_task(response)
-
+        task = super().create_task(task, listName)
         return task
 
     def update_task(self, task: Task, propertyDiffs: dict = None):
