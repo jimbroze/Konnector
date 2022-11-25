@@ -90,7 +90,8 @@ class Todoist(Platform):
         "name": "content",
         "description": "description",
         "priority": "priority",
-        "due_date": "due_date",  # due date needs special attention
+        "due_date": None,  # due date needs special attention
+        "due_time_included": None,
     }
     appEndpoint = ""
     platformEndpoint = ""
@@ -141,7 +142,12 @@ class Todoist(Platform):
         return f"/tasks/{params['taskId']}", "GET", {}
 
     def _get_url_get_tasks(self, params):
-        return "/tasks", "GET", {"project_id": params["listId"]}
+        outParams = (
+            {"project_id": params["listId"]}
+            if params is not None and "listId" in params
+            else None
+        )
+        return ("/tasks", "GET", outParams)
 
     def _get_url_create_task(self, params):
         # listId is given in task data object
@@ -162,18 +168,19 @@ class Todoist(Platform):
     def _convert_task_to_platform(self, task: Task, new: bool = False) -> dict:
         platformTask = super()._convert_task_to_platform(task, new)
 
+        # TODO put this in main program logic?
         if "clickup" in task.ids:
             platformTask["description"] = task.ids["clickup"]
 
         if task.properties["due_date"] is not None:
             due, timeIncluded = convert_time_to(
-                task.properties["due_date"], task.dueTimeIncluded
+                task.properties["due_date"], task.properties["due_time_included"]
             )
             if timeIncluded:
-                platformTask["due"] = {"due_datetime": due}
+                platformTask["due_datetime"] = due
+                platformTask.pop("due_date", None)
             else:
-                platformTask["due"] = {"due_date": due}
-        platformTask.pop("due_date", None)
+                platformTask["due_date"] = due
         if "priority" in platformTask:
             platformTask["priority"] = 5 - platformTask["priority"]
 
@@ -198,18 +205,34 @@ class Todoist(Platform):
         if task.lists[f"{self}"] == self.lists["next_actions"] and task.properties[
             "description"
         ] not in [None, ""]:
-            task.ids["clickup_id"] = task.properties["description"]
+            task.ids["clickup"] = task.properties["description"]
             task.properties["description"] = ""
 
         if "due" in platformTask and platformTask["due"] is not None:
+            if (
+                "datetime" in platformTask["due"]
+                and platformTask["due"]["datetime"] is not None
+            ):
+                dueDate = platformTask["due"]["datetime"]
+            else:
+                dueDate = platformTask["due"]["date"]
             (
                 task.properties["due_date"],
-                task.dueTimeIncluded,
-            ) = convert_time_from(platformTask["due"]["date"])
+                task.properties["due_time_included"],
+            ) = convert_time_from(dueDate)
+
+        # Required for type conversions
+        convertedTask = Task(
+            properties=task.properties,
+            lists=task.lists,
+            completed=task.completed,
+            new=task.new,
+            ids=task.ids,
+        )
 
         logger.info(f"Task converted from {self}")
-        logger.debug(f"Converted task: {task}")
-        return task
+        logger.debug(f"Converted task: {convertedTask}")
+        return convertedTask
 
     def check_request(self, request):
         if request.headers["User-Agent"] != "Todoist-Webhooks":
@@ -217,8 +240,8 @@ class Todoist(Platform):
         return super().check_request(request)
 
     def get_task(self, task: Task, normalized=True, taskId=None) -> tuple[Task, bool]:
-        task = super().get_task(task, normalized, taskId)
-        return task
+        task, taskExists = super().get_task(task, normalized, taskId)
+        return task, taskExists
 
     def get_tasks(self, listName: str = None, normalized=True) -> list[Task]:
         tasks = super().get_tasks(listName, normalized)
@@ -240,10 +263,8 @@ class Todoist(Platform):
         response = super().delete_task(task)
         return response
 
-    def check_if_task_exists(
-        self, task: Task, listName: str = None
-    ) -> tuple[bool, str]:
-        return super().check_if_task_exists(task, listName)
+    # def check_if_task_exists(self, task: Task, listName: str = None) -> bool:
+    #     return super().check_if_task_exists(task, listName)
 
     def auth_init(self, request):
         return super().auth_init(request)

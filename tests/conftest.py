@@ -3,10 +3,28 @@ from konnector.task import Task, Platform
 from konnector.todoist import Todoist
 
 import pytest
-import time
+import datetime
+import copy
 
 todoist = Todoist("", "")
 TODOIST_IN_LIST = "inbox"
+
+dueDate = int(datetime.datetime(2023, 2, 1, 0, 0, 0).timestamp() * 1000)
+newDate = int(datetime.datetime(2023, 1, 2, 1, 2, 3).timestamp() * 1000)
+NEW_PROPERTIES = {
+    "name": "A task",
+    "description": "This is a task",
+    "priority": 3,  # Fixture removes this to see if default of 3 is set.
+    "due_date": dueDate,  # 1675209600000
+    "due_time_included": False,
+}
+UPDATED_PROPERTIES = {
+    "name": "An updated task",
+    "description": "This is a task",
+    "priority": 1,
+    "due_date": newDate,  # 1672621323000
+    "due_time_included": True,
+}
 
 
 @pytest.fixture(scope="module")
@@ -18,28 +36,27 @@ def test_client():
             yield testing_client  # this is where the testing happens!
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="function")
 def new_task():
+    props = copy.deepcopy(NEW_PROPERTIES)
+    props.pop("priority")  # Test default priority
     task = Task(
-        properties={
-            "name": "A task",
-            "description": "This is a task",
-            "priority": 3,  # 1 highest, 4 lowest. 3 is default.
-            "due_date": int((time.time() + 1000) * 1000),  # 1000 seconds in future (ms)
-        },
+        properties=props,
         new=True,
     )
     return task
+
+
+@pytest.fixture(scope="function")
+def updated_task():
+    taskToUpdate = Task(
+        properties=UPDATED_PROPERTIES,
+        new=False,
+    )
+    return taskToUpdate
 
 
 @pytest.fixture(scope="module")
 def new_platform():
     platform = Platform("https://example.com", "/example")
     return platform
-
-
-@pytest.fixture(scope="module")
-def todoist_task(new_task):
-    task = todoist.create_task(new_task, TODOIST_IN_LIST)
-    yield task
-    todoist.delete_task(task)

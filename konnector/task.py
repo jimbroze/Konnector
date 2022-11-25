@@ -15,24 +15,23 @@ def reverse_lookup(lookupVal, dictionary: dict):
 
 
 class Task:
-    """A task"""
+    """This is a task"""
 
     # Default instance variables
-    properties = {
-        "name": "",
-        "description": None,
-        "priority": 3,  # 1 highest, 4 lowest. 3 is default.
-        "due_date": None,  # time since epoch
-    }
-    dueTimeIncluded = None
-    new = False
-    lists = {}
-    completed = {}
-    ids = {}
+    # properties = {
+    #     "name": "",
+    #     "description": None,
+    #     "priority": 3,  # 1 highest, 4 lowest. 3 is default.
+    #     "due_date": None,  # time since epoch in ms
+    #     "due_time_included": None,
+    # }
+    # new = False
+    # lists = {}
+    # completed = {}
+    # ids = {}
 
     def __init__(
         self,
-        name: str = None,
         properties: dict = None,
         new: bool = None,
         lists: str = None,
@@ -40,11 +39,25 @@ class Task:
         ids: dict = None,
     ):
         """Initialise a task"""
-        if name is not None:
-            self.properties["name"] = name
+        # Defaults
+        self.properties = {
+            "name": "",
+            "description": None,
+            "priority": 3,  # 1 highest, 4 lowest. 3 is default.
+            "due_date": None,  # time since epoch in ms
+            "due_time_included": False,
+        }
+        self.new = False
+        self.lists = {}
+        self.completed = {}
+        self.ids = {}
+
         if properties is not None:
             for propName in properties:
-                self.properties[propName] = properties[propName]
+                if properties[propName] is not None:
+                    self.properties[propName] = properties[propName]
+                    if propName in ("priority", "due_date"):
+                        self.properties[propName] = int(self.properties[propName])
         if new is not None:
             self.new = new
         if lists is not None:
@@ -52,10 +65,17 @@ class Task:
         if completed is not None:
             self.completed = completed
         if ids is not None:
-            self.ids = ids
+            for idPlatform in ids:
+                self.ids[idPlatform] = str(ids[idPlatform])
 
     def __str__(self):
-        return f"{self.properties['name']}"
+        return f"Task name is {self.properties['name']}"
+
+    def __repr__(self):
+        return (
+            f"Task(properties={self.properties}, new={self.new}, lists={self.lists},"
+            f" completed={self.completed}, ids={self.ids})"
+        )
 
     def __sub__(self, other: Task) -> Task:
         """
@@ -66,7 +86,7 @@ class Task:
             k: (
                 self.properties[k]
                 if self.properties[k] != other.properties[k]
-                else Task.properties[k]
+                else None
             )
             for k in self.properties
         }
@@ -253,12 +273,17 @@ class Platform:
             logger.error(f"request type {reqType}. headers: {headers}. data: {data}")
 
             raise
+        if response.headers.get("Content-Type") is None:
+            return
         if "application/json" in response.headers.get("Content-Type"):
             logger.debug(f"Request response (JSON): {response.json()}")
             return response.json()
         else:
             logger.debug(f"Request response (text): {response.text}")
             return response.text
+
+    def _get_result_get_tasks(self, response):
+        return response
 
     def _convert_task_to_platform(self, task: Task, new: bool = False) -> dict:
         """
@@ -275,7 +300,8 @@ class Platform:
             # Any prop could be None because of Task subtraction operation
             if propValue is not None:
                 platformPropName = self.propertyMappings[propName]
-                platformProps[platformPropName] = propValue
+                if platformPropName is not None:
+                    platformProps[platformPropName] = propValue
 
         return platformProps
 
@@ -288,7 +314,9 @@ class Platform:
         taskProps = {}
         for propName, platformPropName in self.propertyMappings.items():
             if platformPropName in platformTask:
-                taskProps[propName] = platformTask[platformPropName]
+                # Don't try to store dictionaries. These must be handled seperately.
+                if not isinstance(platformTask[platformPropName], dict):
+                    taskProps[propName] = platformTask[platformPropName]
 
         lists = {
             f"{self}": reverse_lookup(
@@ -395,10 +423,12 @@ class Platform:
         Returns:
             (list): A list of (Task) objects
         """
-        listId = self.lists[listName]
-        url, reqType, params = self._get_url_get_tasks({"listId": listId})
+        params = {"listId": self.lists[listName]} if listName is not None else None
+        url, reqType, params = self._get_url_get_tasks(params)
         try:
-            retrievedTasks = self._send_request(url, reqType, params)
+            retrievedTasks = self._get_result_get_tasks(
+                self._send_request(url, reqType, params)
+            )
         except requests.exceptions.RequestException as err:
             raise Exception(f"Error getting tasks from {self}: {err}")
 
@@ -407,7 +437,8 @@ class Platform:
         normalizedTasks = []
         for retrievedTask in retrievedTasks:
             normalizedTask = self._convert_task_from_platform(retrievedTask)
-            normalizedTask["new"] = True if listName in self.newTaskLists else False
+            if listName is not None:
+                normalizedTask.new = True if listName in self.newTaskLists else False
             normalizedTasks.append(normalizedTask)
         logger.info(f"{self} tasks retrieved.")
         logger.debug(f"Retrieved tasks: {normalizedTasks}")
@@ -514,9 +545,7 @@ class Platform:
         logger.debug(f"Deleted task: {task}")
         return True
 
-    def check_if_task_exists(
-        self, task: Task, listName: str = None
-    ) -> tuple[bool, str]:
+    def check_if_task_exists(self, task: Task, listName: str = None) -> bool:
         # TODO add docstring and logging
         """Doesn't currently check closed tasks"""
         # Check if longest id = 0
@@ -526,16 +555,15 @@ class Platform:
         if noIdsExist:
             return False
         retrievedTasks = self.get_tasks(listName)
-        for retrievedTask in retrievedTasks:
-            for platformName, platformId in task.ids.items():
+        for platformName, platformId in task.ids.items():
+            for retrievedTask in retrievedTasks:
                 if (
                     platformName in retrievedTask.ids
                     and retrievedTask.ids[platformName] == platformId
                 ):
                     logger.info(f"{platformName} ID exists in {self} for task {task}.")
-                    return True, retrievedTask.ids[platformName]
-                else:
-                    return False
+                    return True
+        return False
 
     def add_id(self, task: Task, platform: str, id: str):
         # TODO

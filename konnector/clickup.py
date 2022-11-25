@@ -3,6 +3,7 @@ from konnector.task import Task, Platform
 import os
 import hmac
 import logging
+import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,7 +12,7 @@ logger = logging.getLogger("gunicorn.error")
 
 class Clickup(Platform):
     name = "clickup"
-    apiUrl = "https://api.clickup.com/api/v2/"
+    apiUrl = "https://api.clickup.com/api/v2"
     accessToken = os.environ["CLICKUP_TOKEN"]
     clientId = os.environ["CLICKUP_WEBHOOK_ID"]
     secret = os.environ["CLICKUP_WEBHOOK_SECRET"]
@@ -27,6 +28,7 @@ class Clickup(Platform):
         "description": "description",
         "priority": "priority",
         "due_date": "due_date",
+        "due_time_included": "due_date_time",
     }
     appEndpoint = ""
     platformEndpoint = ""
@@ -88,16 +90,16 @@ class Clickup(Platform):
         return f"/task/{params['taskId']}", "PUT", {}
 
     def _get_url_delete_task(self, params):
-        return f"/tasks/{params['taskId']}", "DELETE", {}
+        return f"/task/{params['taskId']}", "DELETE", {}
 
     def _send_request(self, url, reqType="GET", params={}, data={}, useApiUrl=True):
         return super()._send_request(url, reqType, params, data, useApiUrl)
 
+    def _get_result_get_tasks(self, response):
+        return super()._get_result_get_tasks(response)["tasks"]
+
     def _convert_task_to_platform(self, task: Task, new: bool = False) -> dict:
         platformTask = super()._convert_task_to_platform(task, new)
-
-        if task["due_date"] is not None:
-            platformTask["due_date_time"] = task.dueTimeIncluded
 
         if new is True and "todoist" in task.ids:
             platformTask["assignees"] = [self.userIds[0]]
@@ -115,9 +117,26 @@ class Clickup(Platform):
     def _convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
         task = super()._convert_task_from_platform(platformTask, new)
 
-        # Isn't currently provided from get_task api call but included for updates
-        if "due_date_time" in platformTask:
-            task.dueTimeIncluded = platformTask["due_date_time"]
+        # TODO Does this work with DST?
+        if "due_date" in task.properties and task.properties["due_date"] is not None:
+            dueDate = datetime.datetime.fromtimestamp(
+                task.properties["due_date"] / 1000
+            )
+            if dueDate.hour == 4 and dueDate.minute == 0:
+                task.properties["due_date"] = task.properties["due_date"] - (
+                    4 * 60 * 60 * 1000
+                )
+                task.properties["due_time_included"] = False
+            else:
+                task.properties["due_time_included"] = True
+
+        if "priority" in platformTask:
+            if isinstance(platformTask["priority"], dict):  # get_task
+                task.properties["priority"] = platformTask["priority"]["id"]
+            elif platformTask["priority"] is not None:  # create_task response
+                task.properties["priority"] = platformTask["priority"]
+        # else:  # TODO No priority in Clickup is 3?
+        #     task.properties["priority"] = 3
 
         if "custom_fields" in platformTask:
             for customField in platformTask["custom_fields"]:
@@ -127,10 +146,15 @@ class Clickup(Platform):
                 ):
                     task.ids["todoist"] = customField["value"]
 
-        if "priority" not in platformTask:
-            task.properties["priority"] = 3
-
-        task.status = platformTask["status"]["status"]
+        # Required for type conversions
+        convertedTask = Task(
+            properties=task.properties,
+            lists=task.lists,
+            completed=task.completed,
+            new=task.new,
+            ids=task.ids,
+        )
+        convertedTask.status = platformTask["status"]["status"]
 
         # TODO check if priority is given as a string or dict with ID key
 
@@ -138,8 +162,8 @@ class Clickup(Platform):
         #     task.parentTask = platformTask["parent"]
 
         logger.info(f"Task converted from {self}")
-        logger.debug(f"Converted task: {task}")
-        return task
+        logger.debug(f"Converted task: {convertedTask}")
+        return convertedTask
 
     def check_request(self, request):
         event, listName, normalizedTask, data = super().check_request(request)
@@ -153,10 +177,11 @@ class Clickup(Platform):
         return event, listName, normalizedTask, data
 
     def get_task(self, task: Task, normalized=True, taskId=None) -> tuple[Task, bool]:
-        task = super().get_task(task, normalized, taskId)
-        return task
+        task, taskExists = super().get_task(task, normalized, taskId)
+        return task, taskExists
 
-    def get_tasks(self, listName: str = None, normalized=True) -> list[Task]:
+    def get_tasks(self, listName: str, normalized=True) -> list[Task]:
+        # Listname required for clickup
         tasks = super().get_tasks(listName, normalized)
         return tasks
 
@@ -165,6 +190,7 @@ class Clickup(Platform):
         return task
 
     def update_task(self, task: Task, propertyDiffs: dict = None):
+        # TODO name, description trying to set old ones? ID should just be num
         response = super().update_task(task, propertyDiffs)
         return response
 
@@ -176,9 +202,8 @@ class Clickup(Platform):
         response = super().delete_task(task)
         return response
 
-    def check_if_task_exists(
-        self, task: Task, listName: str = None
-    ) -> tuple[bool, str]:
+    def check_if_task_exists(self, task: Task, listName: str) -> bool:
+        # listName required in Clickup
         return super().check_if_task_exists(task, listName)
 
     def get_webhook(self, request):
