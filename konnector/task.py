@@ -17,26 +17,13 @@ def reverse_lookup(lookupVal, dictionary: dict):
 class Task:
     """This is a task"""
 
-    # Default instance variables
-    # properties = {
-    #     "name": "",
-    #     "description": None,
-    #     "priority": 3,  # 1 highest, 4 lowest. 3 is default.
-    #     "due_date": None,  # time since epoch in ms
-    #     "due_time_included": None,
-    # }
-    # new = False
-    # lists = {}
-    # completed = {}
-    # ids = {}
-
     def __init__(
         self,
         properties: dict = None,
         new: bool = None,
-        lists: str = None,
-        completed: bool = None,
-        ids: dict = None,
+        lists: dict[Platform, str] = None,
+        completed: dict[Platform, str] = None,
+        ids: dict[Platform, str] = None,
     ):
         """Initialise a task"""
         # Defaults
@@ -48,9 +35,9 @@ class Task:
             "due_time_included": False,
         }
         self.new = False
-        self.lists = {}
-        self.completed = {}
-        self.ids = {}
+        self.lists = {}  # {Platform: "listName"}
+        self.completed = {}  # {Platform: bool}
+        self.ids = {}  # {Platform: "id"}
 
         if properties is not None:
             for propName in properties:
@@ -69,7 +56,7 @@ class Task:
                 self.ids[idPlatform] = str(ids[idPlatform])
 
     def __str__(self):
-        return f"Task name is {self.properties['name']}"
+        return f"{self.properties['name']}"
 
     def __repr__(self):
         return (
@@ -90,16 +77,21 @@ class Task:
             )
             for k in self.properties
         }
-        # TODO check if list, completed and ID comparison works correctly if needed.
         listDiffs = {
-            k: self.lists[k] for k in self.lists if self.lists[k] != other.lists[k]
+            k: self.lists[k]
+            for k in self.lists
+            if k not in other.lists or self.lists[k] != other.lists[k]
         }
         completedDiffs = {
             k: self.completed[k]
             for k in self.completed
-            if self.completed[k] != other.completed[k]
+            if k not in other.completed or self.completed[k] != other.completed[k]
         }
-        idDiffs = {k: self.ids[k] for k in self.ids if self.ids[k] != other.ids[k]}
+        idDiffs = {
+            k: self.ids[k]
+            for k in self.ids
+            if k not in other.ids or self.ids[k] != other.ids[k]
+        }
         newTask = Task(
             properties=propDiffs,
             lists=listDiffs,
@@ -108,8 +100,18 @@ class Task:
         )
         return newTask
 
-    def add_id(self, platform: str, id: str):
+    def get_list(self, platform: Platform) -> str:
+        return self.lists[platform] if platform in self.lists else None
+
+    def get_id(self, platform: Platform) -> str:
+        return self.ids[platform] if platform in self.ids else None
+
+    def add_id(self, platform: Platform, id: str):
         self.ids[platform] = id
+
+    def count_ids(self) -> int:
+        """Return the number of ids with a length > 0"""
+        return len([v for v in self.ids.values() if len(v) > 0])
 
 
 class Platform:
@@ -136,18 +138,47 @@ class Platform:
         "priority": "priority",
         "due_date": "due_date",
     }
-    appEndpoint = ""
-    platformEndpoint = ""
     authURL = ""
     callbackURL = ""
 
-    def __init__(self, appEndpoint, platformEndpoint):
+    def __init__(
+        self,
+        appEndpoint,
+        platformEndpoint,
+        # TODO defaults?
+    ):
         """initalise a platfom"""
         self.appEndpoint = appEndpoint
         self.platformEndpoint = platformEndpoint
+        self.fromPlatformCustomFuncs = []
+        self.toPlatformCustomFuncs = []
 
     def __str__(self):
         return f"{self.name}"
+
+    # hash, eq, ne defined to use platform as dict keys
+    def __key(self):
+        return (
+            self.name,
+            self.apiUrl,
+            self.clientId,
+            self.secret,
+        )
+
+    def __hash__(self):
+        return hash(self.__key())
+
+    def __eq__(self, other):
+        if isinstance(other, Platform):
+            return self.__key() == other.__key()
+        return NotImplemented
+
+    def __ne__(self, other):
+        # Not strictly necessary, but to avoid having both x==y and x!=y
+        # True at the same time
+        if isinstance(other, Platform):
+            return not (self.__key() == other.__key())
+        return NotImplemented
 
     def _digest_hmac(self, hmac: hmac.HMAC):
         return hmac.digest()
@@ -285,7 +316,7 @@ class Platform:
     def _get_result_get_tasks(self, response):
         return response
 
-    def _convert_task_to_platform(self, task: Task, new: bool = False) -> dict:
+    def _convert_task_to_platform(self, task: Task) -> dict:
         """
         Convert a Task object to work with the platform's API by using its notation.
         Arguments:
@@ -303,9 +334,12 @@ class Platform:
                 if platformPropName is not None:
                     platformProps[platformPropName] = propValue
 
+        for customFunc in self.toPlatformCustomFuncs:
+            platformProps = customFunc(self, task, platformProps)
+
         return platformProps
 
-    def _convert_task_from_platform(self, platformTask, new: bool = None) -> Task:
+    def _convert_task_from_platform(self, platformProps, new: bool = None) -> Task:
         """
         Convert tasks into Task objects
         """
@@ -313,31 +347,41 @@ class Platform:
 
         taskProps = {}
         for propName, platformPropName in self.propertyMappings.items():
-            if platformPropName in platformTask:
+            if platformPropName in platformProps:
                 # Don't try to store dictionaries. These must be handled seperately.
-                if not isinstance(platformTask[platformPropName], dict):
-                    taskProps[propName] = platformTask[platformPropName]
+                if not isinstance(platformProps[platformPropName], dict):
+                    taskProps[propName] = platformProps[platformPropName]
 
         lists = {
-            f"{self}": reverse_lookup(
-                self._get_list_id_from_task(platformTask), self.lists
-            )
+            self: reverse_lookup(self._get_list_id_from_task(platformProps), self.lists)
         }
-        # TODO does this correctly give boolean?
         try:
-            platformCompleted = self._get_complete_from_task(platformTask)
+            platformCompleted = self._get_complete_from_task(platformProps)
         except (KeyError, IndexError, NameError, AttributeError):
             platformCompleted = None
-        completed = {f"{self}": platformCompleted}
-        ids = {f"{self}": self._get_id_from_task(platformTask)}
+        completed = {self: platformCompleted}
+        ids = {self: self._get_id_from_task(platformProps)}
 
-        return Task(
+        task = Task(
             properties=taskProps,
             lists=lists,
             completed=completed,
             new=new,
             ids=ids,
         )
+
+        # fromPlatformCustomFuncs = ["func1", "func2"]
+        for customFunc in self.fromPlatformCustomFuncs:
+            task = customFunc(self, platformProps, task)
+        return task
+
+    def set_custom_funcs(self, fromFuncs, toFuncs):
+        """
+        Set additional functions that run when
+        converting tasks to or from the platform.
+        """
+        self.fromPlatformCustomFuncs = fromFuncs
+        self.toPlatformCustomFuncs = toFuncs
 
     def check_request(self, request):
         """
@@ -391,10 +435,10 @@ class Platform:
 
         logger.debug(f"Getting {self} task")
         if taskId is None:
-            if f"{self.name}" not in task.ids:
-                logger.debug(f"{self.name} ID does not exist in the task: {task}")
-                return {}, False
-            taskId = task.ids[f"{self}"]
+            if task.get_id(self) is None:
+                logger.debug(f"{self} ID does not exist in the task: {task}")
+                return Task(), False
+            taskId = task.get_id(self)
         url, reqType, params = self._get_url_get_task({"taskId": taskId})
         try:
             retrieved_task = self._send_request(url, reqType, params)
@@ -402,7 +446,6 @@ class Platform:
             raise Exception(
                 f"Error retrieving task with ID {taskId} from {self}: {err}"
             )
-            return {}, False
         outTask = (
             self._convert_task_from_platform(retrieved_task)
             if normalized is True
@@ -419,7 +462,6 @@ class Platform:
             list (str default=None): an optional list that tasks should be taken from
             normalized (bool, default=True):
                 If the tasks should be returned as Task objects
-                TODO should they always be task objects??
         Returns:
             (list): A list of (Task) objects
         """
@@ -479,10 +521,10 @@ class Platform:
         Returns:
             (bool): If the operation was successful
         """
-        taskId = task.ids[f"{self.name}"]
+        taskId = task.get_id(self)
         retrievedTask, taskExists = self.get_task(task)
         if not taskExists:
-            raise Exception(f"error getting {task} from {self}")
+            raise Exception(f'error getting Task "{task}" from {self}')
         if propertyDiffs is None:
             # get a properties dict with properties that have changed. Others are empty.
             propertyDiffs = (task - retrievedTask).properties
@@ -509,9 +551,11 @@ class Platform:
         Returns:
             (bool): If the operation was successful
         """
-        taskId = task.ids[f"{self.name}"]
+        taskId = task.get_id(self)
         retrievedTask, taskExists = self.get_task(task)
-        if retrievedTask.completed[f"{self}"]:
+        if not taskExists:
+            raise Exception(f'error getting Task "{task}" from {self}')
+        if retrievedTask.completed[self]:
             raise Exception(f"{self} task already complete")
 
         url, reqType, params = self._get_url_complete_task({"taskId": taskId})
@@ -525,15 +569,17 @@ class Platform:
 
     def delete_task(self, task: Task):
         """
-        Mark an existing task as complete on the platform's API.
+        Delete a task on the platform's API.
         Arguments:
-            task (Task): A task to be marked complete.
+            task (Task): A task to be deleted.
         Returns:
             (bool): If the operation was successful
         """
-        taskId = task.ids[f"{self.name}"]
+        taskId = task.get_id(self)
         retrievedTask, taskExists = self.get_task(task)
-        if retrievedTask.completed[f"{self}"]:
+        if not taskExists:
+            raise Exception(f'error getting Task "{task}" from {self}')
+        if retrievedTask.completed[self]:
             raise Exception(f"{self} task already complete")
 
         url, reqType, params = self._get_url_delete_task({"taskId": taskId})
@@ -546,28 +592,32 @@ class Platform:
         return True
 
     def check_if_task_exists(self, task: Task, listName: str = None) -> bool:
-        # TODO add docstring and logging
-        """Doesn't currently check closed tasks"""
-        # Check if longest id = 0
-        noIdsExist = (
-            len(max(task.ids.values(), key=len) if task.ids.values() else "") == 0
-        )
-        if noIdsExist:
+        """
+        Check if a task ID already exists on the platform's API.
+        Doesn't currently check closed tasks
+        Arguments:
+            task (Task): A task containing the ID to be checked.
+        Returns:
+            (bool): If the task exists
+        """
+        logger.info(f"Checking if task {task} exists in {self} list {listName}.")
+
+        if task.count_ids() == 0:
+            logger.warning("No ID in the task to be checked.")
             return False
+
         retrievedTasks = self.get_tasks(listName)
-        for platformName, platformId in task.ids.items():
+        for platform, platformId in task.ids.items():
             for retrievedTask in retrievedTasks:
-                if (
-                    platformName in retrievedTask.ids
-                    and retrievedTask.ids[platformName] == platformId
-                ):
-                    logger.info(f"{platformName} ID exists in {self} for task {task}.")
+                if retrievedTask.get_id(platform) == platformId:
+                    logger.info(f"{platform} ID exists in {self} for task {task}.")
                     return True
+        logger.info(f"No ID exists in {self} for task {task}.")
         return False
 
-    def add_id(self, task: Task, platform: str, id: str):
-        # TODO
+    def add_id(self, task: Task, platform: Platform, id: str):
         task.add_id(platform, id)
+        return self.update_task(task)
 
     def auth_init(self, request):
         return "<a href='" + self.authURL + "'>Click to authorize</a>"
@@ -594,3 +644,68 @@ class Platform:
             if "access_token" in response
             else response["error"]
         )
+
+
+def move_task(task: Task, outLists: dict[Platform, str], deleteTask: bool = False):
+    """
+    Move or copy a task from a list in one platform to a list in another.
+    Parameters
+    ----------
+    input : dict
+      - platform : dict
+        - name : string
+    output : dict
+      - platform : dict
+        - name : string
+    deleteTask : bool
+      If the task should be moved rather than copied.
+    """
+
+    inLists = ""
+    for inPlatform, inList in task.lists.items():
+        inLists += f"\n{inPlatform}: {inList}"
+
+    outTasks = []
+    for outPlatform, outList in outLists.items():
+        logger.debug(
+            f"Attempting to add new task to {outPlatform}-{outList}. "
+            f"Input lists are: {inLists}"
+        )
+        outTasks.append(outPlatform.create_task(input["task"], outList))
+        logger.info(f"Successfully added new task to {outPlatform}.")
+    if deleteTask is True:
+        for inPlatform in task.ids:
+            logger.debug(f"Attempting to delete new task from {inPlatform}")
+            # TODO Possibly add option to remove task, without completing?
+            inPlatform.complete_task(task)
+            logger.info(f"Successfully deleted new task from {inPlatform}")
+    return outTasks
+
+
+def modify_task(task: Task, outLists: dict[Platform, str], event):
+    # TODO does this need to return a task?
+    inLists = ""
+    for inPlatform, inList in task.lists.items():
+        inLists += f"\n{inPlatform}: {inList}"
+
+    results = []
+    for outPlatform, outList in outLists.items():
+        logger.debug(
+            f"Attempting to modify task in {outPlatform}-{outList}. "
+            f"Input lists are: {inLists}"
+            f"Event: {event}"
+        )
+        if not outPlatform.check_if_task_exists(task, outList):
+            logger.debug(f"No valid id for {outPlatform}.")
+            next
+        result = {
+            "task_complete": outPlatform.complete_task,
+            "task_updated": outPlatform.update_task,
+            "task_removed": outPlatform.delete_task,
+        }[event](task)
+        if result:
+            logger.info(f"Successfully completed event: {event} on {outPlatform} task.")
+        else:
+            logger.info(f"Could not complete event: {event} on {outPlatform} task.")
+        results.append(result)
+    return results

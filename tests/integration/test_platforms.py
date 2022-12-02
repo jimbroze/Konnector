@@ -33,10 +33,9 @@ class TestPlatform:
     def platform_task(self, platform, platformInList, new_task):
         task = platform.create_task(new_task, platformInList)
         yield task
-        # taskDeleted = platform.delete_task(task)
-        # print(f"Task successfully deleted: {taskDeleted}")
+        platform.delete_task(task)
 
-    def test_get_tasks(self, platform_task: Task, platform, platformInList):
+    def test_get_tasks(self, platform, platformInList):
         """
         GIVEN a Flask application configured for testing
         WHEN the '/' page is requested (GET)
@@ -76,7 +75,9 @@ class TestPlatform:
         taskExistsinList = platform.check_if_task_exists(platform_task, platformInList)
         assert taskExistsinList is True
 
-    def test_create_task(self, platform_task: Task, new_task: Task, platform):
+    def test_create_task(
+        self, platform_task: Task, platform, platformInList, new_task: Task
+    ):
         """
         GIVEN a Flask application configured for testing
         WHEN the '/' page is requested (GET)
@@ -85,10 +86,10 @@ class TestPlatform:
 
         assert platform_task.properties == new_task.properties
         assert platform_task.properties == NEW_PROPERTIES
-        assert type(platform_task.ids[f"{platform}"]) is str
-        assert type(platform_task.lists[f"{platform}"]) is str
+        assert type(platform_task.ids[platform]) is str
+        assert platform_task.lists[platform] == platformInList
 
-    def test_get_task(self, platform_task: Task, platform):
+    def test_get_task(self, platform_task: Task, platform, platformInList):
         """
         GIVEN a Flask application configured for testing
         WHEN the '/' page is requested (GET)
@@ -99,11 +100,12 @@ class TestPlatform:
         assert taskExists is True
         assert task.properties == platform_task.properties
         assert task.properties == NEW_PROPERTIES
-        assert type(task.ids[f"{platform}"]) is str
-        assert len(task.ids[f"{platform}"]) > 0
-        assert task.ids[f"{platform}"] == platform_task.ids[f"{platform}"]
+        assert type(task.ids[platform]) is str
+        assert len(task.ids[platform]) > 0
+        assert task.ids[platform] == platform_task.ids[platform]
         assert task.new is not True
-        assert task.completed[f"{platform}"] is not True
+        assert task.completed[platform] is not True
+        assert task.lists[platform] == platformInList
 
     def test_update_task(self, platform_task: Task, platform, updated_task: Task):
         """
@@ -121,7 +123,7 @@ class TestPlatform:
         assert updatedPlatformTask.properties == updated_task.properties
         assert updatedPlatformTask.properties == UPDATED_PROPERTIES
         assert updatedPlatformTask.new is not True
-        assert updatedPlatformTask.completed[f"{platform}"] is not True
+        assert updatedPlatformTask.completed[platform] is not True
 
     def test_complete_task(self, platform_task: Task, platform):
         """

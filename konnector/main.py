@@ -1,3 +1,4 @@
+from konnector.task import Task, Platform, modify_task, move_task
 from konnector.todoist import Todoist
 from konnector.clickup import Clickup
 import konnector.helpers as helpers
@@ -17,12 +18,68 @@ load_dotenv()
 
 todoistEndpoint = "/todoist/webhook"
 clickupEndpoint = "/clickup/webhook/call"
+customFieldTodoist = "550a93a0-6978-4664-be6d-777cc0d7aff6"
 
 AUTH = os.getenv("AUTH", "False").lower() in ("true", "1")
 ENDPOINT = os.environ["ENDPOINT"]
 app = Flask(__name__)
 todoist = Todoist(ENDPOINT, todoistEndpoint)
 clickup = Clickup(ENDPOINT, clickupEndpoint)
+
+
+def get_clickup_id_from_todoist(platform: Platform, platformProps, task: Task):
+    """
+    Get clickup ID from Todoist task if in the next actions list.
+    ID is stored in the Todoist task description.
+    """
+    # Description in next actions list tasks used to store Clickup ID
+    if task.lists[platform] == platform.lists["next_actions"] and task.properties[
+        "description"
+    ] not in [None, ""]:
+        task.ids[clickup] = task.properties["description"]
+        task.properties["description"] = ""
+    return task
+
+
+def add_clickup_id_to_todoist(platform: Platform, task: Task, platformProps):
+    """
+    Add Clickup ID to Todoist task when copying or moving.
+    ID is stored in the Todoist task description.
+    """
+    if clickup in task.ids:
+        platformProps["description"] = task.ids["clickup"]
+    return platformProps
+
+
+def get_todoist_id_from_clickup(platform: Platform, platformProps, task: Task):
+    """Get todoist ID from custom field in Clickup if available"""
+    if "custom_fields" in platformProps:
+        for customField in platformProps["custom_fields"]:
+            if customField["id"] == customFieldTodoist and "value" in customField:
+                task.ids[todoist] = customField["value"]
+    return task
+
+
+def add_todoist_id_to_clickup(platform: Platform, task: Task, platformProps):
+    """Add todoist ID to clickup tasks when new and copied from Todoist"""
+    if task.new is True and "todoist" in task.ids:
+        platformProps["assignees"] = [platform.userIds[0]]
+        platformProps["custom_fields"] = [
+            {
+                "id": customFieldTodoist,  # Todoist ID
+                "value": str(task.ids[todoist]),
+            }
+        ]
+    return platformProps
+
+
+todoistFromCustomFuncs = [get_clickup_id_from_todoist]
+todoistToCustomFuncs = [add_clickup_id_to_todoist]
+todoist.set_custom_funcs(todoistFromCustomFuncs, todoistToCustomFuncs)
+
+clickupFromCustomFuncs = [get_todoist_id_from_clickup]
+clickupToCustomFuncs = [add_todoist_id_to_clickup]
+clickup.set_custom_funcs(clickupFromCustomFuncs, clickupToCustomFuncs)
 
 logger = logging.getLogger("gunicorn.error")
 
@@ -101,26 +158,21 @@ def todoist_webhook():
             todoistTask,
             todoistTaskData,
         ) = todoist.check_request(request)
-        inputData = {
-            "platform": todoist,
-            "list": todoistList,
-            "task": todoistTask,
-        }
-        outputData = {"platform": clickup}
+
         if todoistEvent == "new_task":
-            if todoistList in todoist.new_task_projects:
-                outputData["list"] = "inbox"
+            if todoistList in todoist.newTaskLists:
+                clickupList = "inbox"
             elif todoistList == "food_log":
-                outputData["list"] = "food_log"
+                clickupList = "food_log"
             else:
                 raise Exception(f"Invalid Todoist list for new task: {todoistList}")
-            move_task(inputData, outputData, deleteTask=True)
+            move_task(todoistTask, {clickup: clickupList}, deleteTask=True)
         elif todoistEvent in [
             "task_complete",
             "task_updated",
             "task_removed",
         ]:
-            modify_task(inputData, outputData, todoistEvent)
+            modify_task(todoistTask, {clickup: None}, todoistEvent)
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logger.warning(f"Error in processing Todoist webhook: {e}")
@@ -155,27 +207,24 @@ def clickup_webhook_received():
             clickupTask,
             clickupEventData,
         ) = clickup.check_request(request)
-        inputData = {
-            "platform": clickup,
-            "list": clickupList,
-            "task": clickupTask,
-        }
-        outputData = {"platform": todoist}
-        todoistTaskExists, todoistTask = todoist.check_if_task_exists(clickupTask)
+        todoistTask, todoistTaskExists = todoist.get_task(clickupTask)
 
         if clickupEvent in ["task_updated"]:
             # Clickup task into todoist next_actions.
             # Next action status AND (high priority OR due date < 1 week OR no project.)
             if next_actions_criteria(clickupTask):
-                outputData["list"] = "next_actions"
                 if not todoistTaskExists:
                     logger.info("Adding task to next actions list.")
-                    todoistTask = move_task(inputData, outputData, deleteTask=False)
-                    clickup.add_id(clickupTask, "todoist", todoistTask.ids["todoist"])
+                    todoistTask = move_task(
+                        clickupTask, {clickup: "next_actions"}, deleteTask=False
+                    )
+                    clickup.add_id(clickupTask, todoist, todoistTask.get_id(todoist))
                 else:
                     logger.info("Task is already in next actions list.")
-                    todoistTask = modify_task(inputData, outputData, clickupEvent)
-            elif todoistTaskExists and todoistTask["list"] == "next_actions":
+                    todoistTask = modify_task(
+                        clickupTask, {todoist: "next_actions"}, clickupEvent
+                    )
+            elif todoistTaskExists and todoistTask.get_list(todoist) == "next_actions":
                 logger.info("Removing task from next actions list.")
                 todoist.delete_task(clickupTask)
         elif (
@@ -186,7 +235,7 @@ def clickup_webhook_received():
             ]
             and todoistTaskExists
         ):
-            todoistTask = modify_task(inputData, outputData, clickupEvent)
+            todoistTask = modify_task(clickupTask, {todoist: None}, clickupEvent)
         return make_response(jsonify({"status": "success"}), 202)
     except Exception as e:
         logger.warning(f"Error in processing clickup webhook: {e}")
@@ -197,18 +246,13 @@ def move_todoist_inbox():
     """
     Loops through todoist "new task" lists (projects) and moves tasks to Clickup.
     """
+    # TODO prevent webhooks when running? Could pause execution to run wehbook.
     logger.info("Scheduled: Checking Todoist inbox for new tasks.")
     # Clickup rate limits are 100 requests per minute. Highly unlikely to reach this.
-    for newTaskList in todoist.new_task_projects:
+    for newTaskList in todoist.newTaskLists:
         newTodoistTasks = todoist.get_tasks(newTaskList)
         for newTodoistTask in newTodoistTasks:
-            inputData = {
-                "platform": todoist,
-                "list": newTaskList,
-                "task": newTodoistTask,
-            }
-            outputData = {"platform": clickup, "list": "inbox"}
-            move_task(inputData, outputData, deleteTask=True)
+            move_task(newTodoistTask, {clickup: "inbox"}, deleteTask=True)
 
 
 # Schedule check of todoist inbox in case webhook hasn't worked.
@@ -219,69 +263,6 @@ scheduler.add_job(func=move_todoist_inbox, trigger="interval", minutes=10)
 scheduler.start()
 # Shut down the scheduler when exiting the app
 atexit.register(lambda: scheduler.shutdown())
-
-
-def move_task(input, output, deleteTask: bool = False):
-    """
-    Move or copy a task from a list in one platform to a list in another.
-    Parameters
-    ----------
-    input : dict
-      - platform : dict
-        - name : string
-    output : dict
-      - platform : dict
-        - name : string
-    deleteTask : bool
-      If the task should be moved rather than copied.
-    """
-    # TODO can input data be gathered from a task instead of specifying dict?
-    # Task could be an object?
-    inPlatformName = input["platform"].name
-    outPlatformName = output["platform"].name
-    logger.info(
-        f"Attempting to add new task from {inPlatformName}-{input['list']} to"
-        f" {outPlatformName}-{output['list']}"
-    )
-    outputTask = output["platform"].create_task(input["task"], output["list"])
-    logger.info(f"Successfully added new task to {outPlatformName}.")
-    if deleteTask is True:
-        logger.info(f"Attempting to delete new task from {inPlatformName}")
-        # Possibly add option to remove task, without completing, in future?
-        input["platform"].complete_task(input["task"])
-        logger.info(f"Successfully deleted new task from {inPlatformName}")
-    return outputTask
-
-
-def modify_task(input, output, event):
-    inPlatformName = input["platform"].name
-    outPlatformName = output["platform"].name
-    logger.info(
-        f"Attempting to modify task from {inPlatformName} on {outPlatformName}."
-        f"  Event: {event}"
-    )
-    if not checkId(input["task"], outPlatformName):
-        logger.debug(f"No valid id for {outPlatformName}.")
-        return False
-    outputTask = {
-        "task_complete": output["platform"].complete_task,
-        "task_updated": output["platform"].update_task,
-        "task_removed": output["platform"].delete_task,
-    }[event](input["task"])
-    if outputTask is False:
-        return False
-    logger.info(
-        f"Successfully completed event: '{event}' from {inPlatformName} task to"
-        f" {outPlatformName} task"
-    )
-    return outputTask
-
-
-def checkId(task, idType):
-    if f"{idType}_id" not in task:
-        return False
-    return True
-
 
 if __name__ == "__main__":
     # Reloader causes apscheduler to schedule twice in debug mode

@@ -49,11 +49,35 @@ def new_task():
 
 @pytest.fixture(scope="function")
 def updated_task():
-    taskToUpdate = Task(
+    task = Task(
         properties=UPDATED_PROPERTIES,
         new=False,
     )
-    return taskToUpdate
+    return task
+
+
+@pytest.fixture(scope="function")
+def task_1():
+    task = Task(
+        properties=NEW_PROPERTIES,
+        new=True,
+        lists={"todoist": "inbox", "clickup": "inbox"},
+        completed={"todoist": True, "clickup": False},
+        ids={"clickup": "tdstddtrst"},
+    )
+    return task
+
+
+@pytest.fixture(scope="function")
+def task_2():
+    task = Task(
+        properties=UPDATED_PROPERTIES,
+        new=False,
+        lists={"todoist": "inbox", "clickup": "other"},
+        completed={"todoist": True},
+        ids={"clickup": "dtstvbht", "todoist": "tdstddtrst"},
+    )
+    return task
 
 
 @pytest.fixture(scope="module")
