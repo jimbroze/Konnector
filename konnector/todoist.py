@@ -1,4 +1,4 @@
-from konnector.task import Task, Platform
+from konnector.konnector import Task, Platform
 
 import os
 import base64
@@ -64,28 +64,12 @@ class Todoist(Platform):
     name = "todoist"
     # TODO convert to V2
     apiUrl = "https://api.todoist.com/rest/v1"
-    accessToken = os.environ["TODOIST_ACCESS"]
-    clientId = os.environ["TODOIST_CLIENT_ID"]
-    secret = os.environ["TODOIST_SECRET"]
-    userIds = ["20038827"]
-    lists = {
-        "inbox": "2200213434",
-        "alexa-todo": "2231741057",
-        "food_log": "2291635541",
-        "next_actions": "2284385839",
-    }
-    newTaskLists = ["inbox", "alexa-todo"]
     webhookEvents = {
         "item:added": "new_task",
         "item:completed": "task_complete",
         "item:updated": "task_updated",
     }
     signatureKey = "X-Todoist-Hmac-SHA256"
-    headers = {
-        "Authorization": "Bearer " + str(accessToken),
-        "X-Request-Id": str(uuid.uuid4()),
-        "Content-Type": "application/json",
-    }
     propertyMappings = {
         "name": "content",
         "description": "description",
@@ -93,22 +77,47 @@ class Todoist(Platform):
         "due_date": None,  # due date needs special attention
         "due_time_included": None,
     }
-    appEndpoint = ""
-    platformEndpoint = ""
 
-    state = os.environ["TODOIST_STATE"]
-
-    authURL = (
-        "https://todoist.com/oauth/authorize?client_id="
-        + clientId
-        + "&scope=data:read_write,data:delete"
-        + "&state="
-        + state
-    )
     callbackURL = "https://todoist.com/oauth/access_token"
 
-    def __init__(self, appEndpoint, platformEndpoint):
-        super().__init__(appEndpoint, platformEndpoint)
+    def __init__(
+        self,
+        appEndpoint: str,
+        platformEndpoint: str,
+        lists: dict,
+        accessToken: str = None,
+        clientId: str = None,
+        secret: str = None,
+        userIds: list = None,
+        newTaskLists: list = None,
+        state: str = None,
+    ):
+        super().__init__(
+            appEndpoint,
+            platformEndpoint,
+            lists,
+            accessToken,
+            clientId,
+            secret,
+            userIds,
+            newTaskLists,
+        )
+
+        if state is not None:
+            self.state = state
+
+        self.headers = {
+            "Authorization": "Bearer " + str(accessToken),
+            "X-Request-Id": str(uuid.uuid4()),
+            "Content-Type": "application/json",
+        }
+        self.authURL = (
+            "https://todoist.com/oauth/authorize?client_id="
+            + clientId
+            + "&scope=data:read_write,data:delete"
+            + "&state="
+            + self.state
+        )
 
     def _digest_hmac(self, hmac: hmac.HMAC):
         return base64.b64encode(hmac.digest()).decode("utf-8")
@@ -180,8 +189,8 @@ class Todoist(Platform):
         if self in task.lists:
             platformProps["project_id"] = self.lists[task.lists[self]]
 
-        logger.info(f"Task converted to {self}")
-        logger.debug(f"Converted task: {platformProps}")
+        logger.info(f"task object converted to {self} parameters")
+        logger.debug(f"Converted task: {repr(platformProps)}")
         return platformProps
 
     def _convert_task_from_platform(self, platformProps, new: bool = None) -> Task:
@@ -215,7 +224,7 @@ class Todoist(Platform):
             ids=task.ids,
         )
 
-        logger.info(f"Task converted from {self}")
+        logger.info(f"{self} task converted to task object")
         logger.debug(f"Converted task: {convertedTask}")
         return convertedTask
 

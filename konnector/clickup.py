@@ -1,4 +1,4 @@
-from konnector.task import Task, Platform
+from konnector.konnector import Task, Platform
 
 import os
 import hmac
@@ -16,17 +16,8 @@ logger = logging.getLogger("gunicorn.error")
 class Clickup(Platform):
     name = "clickup"
     apiUrl = "https://api.clickup.com/api/v2"
-    accessToken = os.environ["CLICKUP_TOKEN"]
-    clientId = os.environ["CLICKUP_WEBHOOK_ID"]
-    secret = os.environ["CLICKUP_WEBHOOK_SECRET"]
-    # -1 is Clickbot
-    # TODO move to main program
-    userIds = ["2511898", 0, -1]
-    lists = {"inbox": "38260663", "food_log": "176574082"}
-    newTaskLists = []
     webhookEvents = {"taskUpdated": "task_updated"}
     signatureKey = "X-Signature"
-    headers = {"Authorization": accessToken, "Content-Type": "application/json"}
     propertyMappings = {
         "name": "name",
         "description": "description",
@@ -34,19 +25,47 @@ class Clickup(Platform):
         "due_date": "due_date",
         "due_time_included": "due_date_time",
     }
-    appEndpoint = ""
-    platformEndpoint = ""
     authURL = ""
     callbackURL = ""
 
-    workspace = "2193273"
-    folder = "17398998"
-    listStatuses = {
-        "inbox": ["next action", "complete"],
-    }
+    def __init__(
+        self,
+        appEndpoint: str,
+        platformEndpoint: str,
+        lists: dict,
+        accessToken: str,
+        clientId: str,
+        secret: str,
+        userIds: list,
+        workspace: str,
+        newTaskLists: list = None,
+        folder: str = None,
+        listStatuses: dict = None,
+    ):
+        super().__init__(
+            appEndpoint,
+            platformEndpoint,
+            lists,
+            accessToken,
+            clientId,
+            secret,
+            userIds,
+            newTaskLists,
+        )
 
-    def __init__(self, appEndpoint, platformEndpoint):
-        super().__init__(appEndpoint, platformEndpoint)
+        # Defaults
+        self.listStatuses = {}
+
+        if folder is not None:
+            self.folder = folder
+        if listStatuses is not None:
+            self.listStatuses = listStatuses
+
+        self.workspace = workspace
+        self.headers = {
+            "Authorization": accessToken,
+            "Content-Type": "application/json",
+        }
 
     def _digest_hmac(self, hmac: hmac.HMAC):
         return hmac.hexdigest()
@@ -65,7 +84,9 @@ class Clickup(Platform):
         return super()._get_check_event_from_webhook(data["event"])
 
     def _get_task_from_webhook(self, data):
-        return self.get_task(taskId=data["id"], normalized=False)
+        taskId = data["task_id"]
+        # Does get_task really need to return 2 values? Return None
+        return self.get_task(taskId=taskId, normalized=False)[0]
 
     def _get_id_from_task(self, data):
         return str(data["id"])
@@ -101,7 +122,7 @@ class Clickup(Platform):
     def _convert_task_to_platform(self, task: Task) -> dict:
         platformProps = super()._convert_task_to_platform(task)
 
-        logger.info(f"Task converted to {self}")
+        logger.info(f"task object converted to {self} parameters")
         logger.debug(f"Converted task: {platformProps}")
         return platformProps
 
@@ -142,12 +163,13 @@ class Clickup(Platform):
             ids=task.ids,
         )
         convertedTask.status = platformProps["status"]["status"]
+        convertedTask.subTask = False if platformProps["parent"] is None else True
 
         # if "parent" in platformProps and platformProps["parent"] is not None:
         #     task.parentTask = platformProps["parent"]
 
-        logger.info(f"Task converted from {self}")
-        logger.debug(f"Converted task: {convertedTask}")
+        logger.info(f"{self} task converted to task object")
+        logger.debug(f"Converted task: {repr(convertedTask)}")
         return convertedTask
 
     def check_request(self, request):
@@ -163,6 +185,8 @@ class Clickup(Platform):
 
     def get_tasks(self, listName: str, normalized=True) -> list[Task]:
         # Listname required for clickup
+        if listName is None:
+            raise Exception("A list name is required to get tasks from Clickup")
         tasks = super().get_tasks(listName, normalized)
         return tasks
 
@@ -172,16 +196,17 @@ class Clickup(Platform):
 
     def get_webhook(self, request):
         """Delete the clickup instance's webhook."""
-        response = self._send_request("team/" + self.workspace + "/webhook", "GET")
+        response = self._send_request("/team/" + self.workspace + "/webhook", "GET")
         return response
 
     def modify_webhook(self, request):
         """Create or update the clickup webhook"""
 
         requestBody = {
-            "endpoint": self.endpoint,
-            "events": self.webhookEvents,
+            "endpoint": self.appEndpoint + self.platformEndpoint,
+            "events": tuple(self.webhookEvents.keys()),
         }
+        logger.debug(self.clientId)
         if self.folder is not None:
             requestBody["folder_id"] = self.folder
         if self.clientId is not None:  # Update webhook
@@ -197,5 +222,5 @@ class Clickup(Platform):
     def delete_webhook(self, request):
         """Delete the clickup instance's webhook."""
         webhookId = self.clientId
-        response = self._send_request("webhook/" + webhookId, "DELETE")
+        response = self._send_request("/webhook/" + webhookId, "DELETE")
         return response

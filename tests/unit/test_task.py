@@ -1,5 +1,5 @@
 from conftest import NEW_PROPERTIES, UPDATED_PROPERTIES
-from konnector.task import Task
+from konnector.konnector import Task
 
 
 def test_new_task(new_task):

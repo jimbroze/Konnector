@@ -1,17 +1,15 @@
-from konnector.task import Task
-from konnector.todoist import Todoist
-from konnector.clickup import Clickup
-from conftest import NEW_PROPERTIES, UPDATED_PROPERTIES
+from konnector.konnector import Task
+from konnector.main import todoist, clickup
+from conftest import (
+    NEW_PROPERTIES,
+    UPDATED_PROPERTIES,
+    TODOIST_IN_LIST,
+    CLICKUP_IN_LIST,
+)
 
 import pytest
 import copy
 import time
-
-todoist = Todoist("", "")
-clickup = Clickup("", "")
-
-TODOIST_IN_LIST = "inbox"
-CLICKUP_IN_LIST = "inbox"
 
 
 def test_webhook(test_client):
@@ -35,7 +33,7 @@ class TestPlatform:
         yield task
         platform.delete_task(task)
 
-    def test_get_tasks(self, platform, platformInList):
+    def test_get_tasks(self, platform_task: Task, platform, platformInList):
         """
         GIVEN a Flask application configured for testing
         WHEN the '/' page is requested (GET)

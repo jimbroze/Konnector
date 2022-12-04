@@ -1,4 +1,6 @@
+# Postponed evaluation allows static typing reference to class within itself
 from __future__ import annotations
+from typing import Union
 import requests
 import logging
 import hmac
@@ -30,7 +32,7 @@ class Task:
         self.properties = {
             "name": "",
             "description": None,
-            "priority": 3,  # 1 highest, 4 lowest. 3 is default.
+            "priority": None,  # 1 highest, 4 lowest. 3 is default.
             "due_date": None,  # time since epoch in ms
             "due_time_included": False,
         }
@@ -47,6 +49,8 @@ class Task:
                         self.properties[propName] = int(self.properties[propName])
         if new is not None:
             self.new = new
+            if new is True:
+                self.properties["priority"] = 3  # Default priority on new tasks is 3
         if lists is not None:
             self.lists = lists
         if completed is not None:
@@ -103,6 +107,9 @@ class Task:
     def get_list(self, platform: Platform) -> str:
         return self.lists[platform] if platform in self.lists else None
 
+    def add_list(self, platform: Platform, listName: str):
+        self.lists[platform] = listName
+
     def get_id(self, platform: Platform) -> str:
         return self.ids[platform] if platform in self.ids else None
 
@@ -119,12 +126,7 @@ class Platform:
 
     name = ""
     apiUrl = ""
-    accessToken = ""
-    clientId = ""
-    secret = ""
-    userIds = []
-    lists = {}
-    newTaskLists = []
+    # TODO add list of events to listen for in main app
     webhookEvents = {
         "new_task": "new_task",
         "task_complete": "task_complete",
@@ -143,27 +145,47 @@ class Platform:
 
     def __init__(
         self,
-        appEndpoint,
-        platformEndpoint,
-        # TODO defaults?
+        appEndpoint: str,
+        platformEndpoint: str,
+        lists: dict,
+        accessToken: str = None,
+        clientId: str = None,
+        secret: str = None,
+        userIds: list = None,
+        newTaskLists: list = None,
     ):
         """initalise a platfom"""
-        self.appEndpoint = appEndpoint
-        self.platformEndpoint = platformEndpoint
+        # Defaults
+        self.accessToken = ""
+        self.clientId = ""
+        self.secret = ""
+        self.userIds = []
+        self.newTaskLists = []
         self.fromPlatformCustomFuncs = []
         self.toPlatformCustomFuncs = []
+
+        if accessToken is not None:
+            self.accessToken = accessToken
+        if clientId is not None:
+            self.clientId = clientId
+        if secret is not None:
+            self.secret = secret
+        if userIds is not None:
+            self.userIds = userIds
+        if newTaskLists is not None:
+            self.newTaskLists = newTaskLists
+
+        self.lists = lists
+        self.appEndpoint = appEndpoint
+        self.platformEndpoint = platformEndpoint
 
     def __str__(self):
         return f"{self.name}"
 
     # hash, eq, ne defined to use platform as dict keys
     def __key(self):
-        return (
-            self.name,
-            self.apiUrl,
-            self.clientId,
-            self.secret,
-        )
+        # Assume that platforms with the same name are equal
+        return self.name
 
     def __hash__(self):
         return hash(self.__key())
@@ -185,23 +207,23 @@ class Platform:
 
     def _get_check_user_from_webhook(self, userId):
         """ """
-
-        if userId not in self.userIds:
-            raise Exception(f"Unrecognised {self} User: {userId}")
-        logger.debug(f"{self} user recognised: {userId}")
-        return userId
+        userIdStr = str(userId)
+        if userIdStr not in self.userIds:
+            raise Exception(f"Unrecognised {self} User: {userIdStr}")
+        logger.debug(f"{self} user recognised: {userIdStr}")
+        return userIdStr
 
     def _get_check_list_from_webhook(self, listId):
         """
         Check if the event that fired the webhook is recognised.
         Raise an exception otherwise.
         """
-
-        if listId not in self.lists.values():
-            raise Exception(f"Invalid {self} list ID: {listId}")
-        listName = reverse_lookup(listId, self.lists)
-        logger.debug(f"{self} list recognised: {listName}. ID: {listId}")
-        return listName, listId
+        listIdStr = str(listId)
+        if listIdStr not in self.lists.values():
+            raise Exception(f"Invalid {self} list ID: {listIdStr}")
+        listName = reverse_lookup(listIdStr, self.lists)
+        logger.debug(f"{self} list recognised: {listName}. ID: {listIdStr}")
+        return listName, listIdStr
 
     def _get_check_event_from_webhook(self, platformEvent):
         """
@@ -209,11 +231,11 @@ class Platform:
         Raise an exception otherwise.
         """
 
-        if platformEvent not in self.webhookEvents.values():
+        if platformEvent not in self.webhookEvents.keys():
             raise Exception(f"Invalid {self} event: {platformEvent}")
         eventType = self.webhookEvents[platformEvent]
         logger.debug(
-            f"{self} event recognised: {eventType}. Clickup notation: {platformEvent}"
+            f"{self} event recognised: {eventType}. {self} notation: {platformEvent}"
         )
         return eventType, platformEvent
 
@@ -224,7 +246,7 @@ class Platform:
         return str(data["id"])
 
     def _get_list_id_from_task(self, data):
-        return data["list_id"]
+        return str(data["list_id"])
 
     def _get_complete_from_task(self, data):
         return data["completed"]
@@ -333,7 +355,6 @@ class Platform:
                 platformPropName = self.propertyMappings[propName]
                 if platformPropName is not None:
                     platformProps[platformPropName] = propValue
-
         for customFunc in self.toPlatformCustomFuncs:
             platformProps = customFunc(self, task, platformProps)
 
@@ -351,7 +372,6 @@ class Platform:
                 # Don't try to store dictionaries. These must be handled seperately.
                 if not isinstance(platformProps[platformPropName], dict):
                     taskProps[propName] = platformProps[platformPropName]
-
         lists = {
             self: reverse_lookup(self._get_list_id_from_task(platformProps), self.lists)
         }
@@ -361,7 +381,6 @@ class Platform:
             platformCompleted = None
         completed = {self: platformCompleted}
         ids = {self: self._get_id_from_task(platformProps)}
-
         task = Task(
             properties=taskProps,
             lists=lists,
@@ -369,7 +388,6 @@ class Platform:
             new=new,
             ids=ids,
         )
-
         # fromPlatformCustomFuncs = ["func1", "func2"]
         for customFunc in self.fromPlatformCustomFuncs:
             task = customFunc(self, platformProps, task)
@@ -411,8 +429,8 @@ class Platform:
         logger.debug(f"Request data: {data}")
 
         self._get_check_user_from_webhook(data)
-        event = self._get_check_event_from_webhook(data)
-        listName = self._get_check_list_from_webhook(data)
+        event, platformEvent = self._get_check_event_from_webhook(data)
+        listName, listId = self._get_check_list_from_webhook(data)
 
         task = self._get_task_from_webhook(data)
         new = True if event == "new_task" else False
@@ -421,7 +439,9 @@ class Platform:
 
         return event, listName, normalizedTask, data
 
-    def get_task(self, task: Task, normalized=True, taskId=None) -> tuple[Task, bool]:
+    def get_task(
+        self, task: Task = None, normalized=True, taskId=None
+    ) -> tuple[Task, bool]:
         """
         Retrieve a specific task from the platform's API.
         Arguments:
@@ -432,9 +452,10 @@ class Platform:
             (Task): The task retrieved and processed
             (bool): If the task exists and was retrieved
         """
-
         logger.debug(f"Getting {self} task")
         if taskId is None:
+            if task is None:
+                raise Exception(f"No {self} task or ID given to get task.")
             if task.get_id(self) is None:
                 logger.debug(f"{self} ID does not exist in the task: {task}")
                 return Task(), False
@@ -496,9 +517,11 @@ class Platform:
             (bool): If the operation was successful
         """
         listId = self.lists[listName]
+
         # Check if any IDs already exist
         if self.check_if_task_exists(task, listName):
             raise Exception(f'Task "{task}" already exists in {self}')
+        task.add_list(self, listName)
         taskToCreate = self._convert_task_to_platform(task)
         url, reqType, params = self._get_url_create_task({"listId": listId})
         try:
@@ -522,6 +545,7 @@ class Platform:
             (bool): If the operation was successful
         """
         taskId = task.get_id(self)
+        logger.debug(f"task is {repr(task)}")
         retrievedTask, taskExists = self.get_task(task)
         if not taskExists:
             raise Exception(f'error getting Task "{task}" from {self}')
@@ -646,7 +670,9 @@ class Platform:
         )
 
 
-def move_task(task: Task, outLists: dict[Platform, str], deleteTask: bool = False):
+def move_task(
+    task: Task, outLists: dict[Platform, str], deleteTask: bool = False
+) -> Union(Task, list[Task]):
     """
     Move or copy a task from a list in one platform to a list in another.
     Parameters
@@ -671,7 +697,7 @@ def move_task(task: Task, outLists: dict[Platform, str], deleteTask: bool = Fals
             f"Attempting to add new task to {outPlatform}-{outList}. "
             f"Input lists are: {inLists}"
         )
-        outTasks.append(outPlatform.create_task(input["task"], outList))
+        outTasks.append(outPlatform.create_task(task, outList))
         logger.info(f"Successfully added new task to {outPlatform}.")
     if deleteTask is True:
         for inPlatform in task.ids:
@@ -679,15 +705,15 @@ def move_task(task: Task, outLists: dict[Platform, str], deleteTask: bool = Fals
             # TODO Possibly add option to remove task, without completing?
             inPlatform.complete_task(task)
             logger.info(f"Successfully deleted new task from {inPlatform}")
-    return outTasks
+    return outTasks[0] if len(outTasks) == 1 else outTasks
 
 
-def modify_task(task: Task, outLists: dict[Platform, str], event):
-    # TODO does this need to return a task?
+def modify_task(inTask: Task, event, outLists: dict[Platform, str] = None):
     inLists = ""
-    for inPlatform, inList in task.lists.items():
+    for inPlatform, inList in inTask.lists.items():
         inLists += f"\n{inPlatform}: {inList}"
 
+    # Loop through output lists and modify tasks. Task must already have outPlatforms ids
     results = []
     for outPlatform, outList in outLists.items():
         logger.debug(
@@ -695,14 +721,12 @@ def modify_task(task: Task, outLists: dict[Platform, str], event):
             f"Input lists are: {inLists}"
             f"Event: {event}"
         )
-        if not outPlatform.check_if_task_exists(task, outList):
-            logger.debug(f"No valid id for {outPlatform}.")
-            next
+        inTask.add_list(outPlatform, outList)
         result = {
             "task_complete": outPlatform.complete_task,
             "task_updated": outPlatform.update_task,
             "task_removed": outPlatform.delete_task,
-        }[event](task)
+        }[event](inTask)
         if result:
             logger.info(f"Successfully completed event: {event} on {outPlatform} task.")
         else:

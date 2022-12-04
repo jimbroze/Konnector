@@ -14,6 +14,6 @@ ENV PATH="${PATH}:/root/.local/bin"
 COPY ./poetry.lock ./pyproject.toml /
 RUN poetry config virtualenvs.create false \
   && poetry install --no-interaction --no-ansi
-RUN mv main.py helloworld.py
+# RUN mv main.py helloworld.py
 COPY . .
 # CMD ["./docker-entrypoint.sh"]

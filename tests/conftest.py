@@ -1,13 +1,12 @@
 from konnector.main import app
-from konnector.task import Task, Platform
-from konnector.todoist import Todoist
+from konnector.konnector import Task, Platform
 
 import pytest
 import datetime
 import copy
 
-todoist = Todoist("", "")
 TODOIST_IN_LIST = "inbox"
+CLICKUP_IN_LIST = "inbox"
 
 dueDate = int(datetime.datetime(2023, 2, 1, 0, 0, 0).timestamp() * 1000)
 newDate = int(datetime.datetime(2023, 1, 2, 1, 2, 3).timestamp() * 1000)
@@ -61,7 +60,7 @@ def task_1():
     task = Task(
         properties=NEW_PROPERTIES,
         new=True,
-        lists={"todoist": "inbox", "clickup": "inbox"},
+        lists={"todoist": TODOIST_IN_LIST, "clickup": CLICKUP_IN_LIST},
         completed={"todoist": True, "clickup": False},
         ids={"clickup": "tdstddtrst"},
     )
@@ -73,7 +72,7 @@ def task_2():
     task = Task(
         properties=UPDATED_PROPERTIES,
         new=False,
-        lists={"todoist": "inbox", "clickup": "other"},
+        lists={"todoist": TODOIST_IN_LIST, "clickup": "other"},
         completed={"todoist": True},
         ids={"clickup": "dtstvbht", "todoist": "tdstddtrst"},
     )
