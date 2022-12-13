@@ -7,7 +7,8 @@
 ## Usage
 
 ### Tasks
-Tasks exist as Task objects with a specific set of attributes:
+Tasks exist as `Task`
+objects with a specific set of attributes:
 ```python
 Task(
     properties={
@@ -25,7 +26,7 @@ Task(
 ```
 
 ### Adding new task management platforms
-Platforms are children of the Platform class. Using the platform's API documentation and platforms that have already been implemented as examples, redefine as many of the classes as necessary.
+New task management platforms are created as a new class with the `Platform` class as a parent. Using the platform's API documentation and looking at examples of platforms that have already been implemented, redefine as many of the class methods as necessary.
 
 The following examples are taken from the `Todoist` platform implementation.
 
@@ -41,7 +42,7 @@ def _get_check_list_from_webhook(self, data):
         return super()._get_check_list_from_webhook(data["event_data"]["project_id"])
 ```
 
-There are two task conversion methods that do the heavy lifting of converting tasks to and from the notation used by the platform:
+There are two task conversion methods that do the heavy lifting of converting tasks to and from the notation used by the platform. Basic property conversion is done within the `Platform` class and the child class takes care of anything specific to the Platform.
 
 TO:
 ```python
