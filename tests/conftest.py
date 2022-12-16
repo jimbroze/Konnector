@@ -1,12 +1,30 @@
-from konnector.main import app
+from konnector.main import app, todoist, clickup
 from konnector.konnector import Task, Platform
 
+# TODO Use init
+from conf.conf_todoist import TODOIST_IN_LIST, todoist_dict, task_todoist  # noqa: F401
+from conf.conf_clickup import CLICKUP_IN_LIST, clickup_dict, task_clickup  # noqa: F401
+
 import pytest
+from pytest_lazyfixture import lazy_fixture
 import datetime
 import copy
 
-TODOIST_IN_LIST = "inbox"
-CLICKUP_IN_LIST = "inbox"
+platformData = [
+    (
+        todoist,
+        TODOIST_IN_LIST,
+        lazy_fixture("todoist_dict"),
+        lazy_fixture("task_todoist"),
+    ),
+    (
+        clickup,
+        CLICKUP_IN_LIST,
+        lazy_fixture("clickup_dict"),
+        lazy_fixture("task_clickup"),
+    ),
+]
+
 
 dueDate = int(datetime.datetime(2023, 2, 1, 0, 0, 0).timestamp() * 1000)
 newDate = int(datetime.datetime(2023, 1, 2, 1, 2, 3).timestamp() * 1000)
@@ -60,9 +78,9 @@ def task_1():
     task = Task(
         properties=NEW_PROPERTIES,
         new=True,
-        lists={"todoist": TODOIST_IN_LIST, "clickup": CLICKUP_IN_LIST},
-        completed={"todoist": True, "clickup": False},
-        ids={"clickup": "tdstddtrst"},
+        lists={todoist: TODOIST_IN_LIST, clickup: CLICKUP_IN_LIST},
+        completed={todoist: True, clickup: False},
+        ids={clickup: "tdstddtrst"},
     )
     return task
 
@@ -72,9 +90,9 @@ def task_2():
     task = Task(
         properties=UPDATED_PROPERTIES,
         new=False,
-        lists={"todoist": TODOIST_IN_LIST, "clickup": "other"},
-        completed={"todoist": True},
-        ids={"clickup": "dtstvbht", "todoist": "tdstddtrst"},
+        lists={todoist: TODOIST_IN_LIST, clickup: "other"},
+        completed={todoist: True},
+        ids={clickup: "dtstvbht", todoist: "tdstddtrst"},
     )
     return task
 

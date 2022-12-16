@@ -20,16 +20,21 @@ def convert_time_from(s):
     """
     Converts a RFC3339 datestamp or timestamp into Epoch time (ms) for standardization
     """
+    if "Z" in s:
+        timezone = "UTC"
+        s = s[:-1]
+    else:
+        timezone = TIMEZONE
     if "T" in s:
-        format = "%Y-%m-%dT%H:%M:%S"
         timeIncluded = True
+        format = "%Y-%m-%dT%H:%M:%S.%f" if "." in s else "%Y-%m-%dT%H:%M:%S"
     else:
         format = "%Y-%m-%d"
         timeIncluded = False
     try:
         date = datetime.datetime.strptime(s, format)
         # Todoist uses local time
-        date = date.replace(tzinfo=tz.gettz(TIMEZONE))
+        date = date.replace(tzinfo=tz.gettz(timezone))
         date = date.astimezone(tz.gettz("UTC"))
         epochTime = time.mktime(date.timetuple()) * 1000  # into millisecs
     except ValueError:
@@ -54,7 +59,7 @@ def convert_time_to(epochTime, timeIncluded=None):
         format = "%Y-%m-%d"
     else:
         timeIncluded = True
-        format = "%Y-%m-%dT%H:%M:%S"  # RFC3339
+        format = "%Y-%m-%dT%H:%M:%S.%f"  # RFC3339
 
     formattedDt = datetime.datetime.strftime(dt, format)
     return formattedDt, timeIncluded
@@ -63,7 +68,7 @@ def convert_time_to(epochTime, timeIncluded=None):
 class Todoist(Platform):
     name = "todoist"
     # TODO convert to V2
-    apiUrl = "https://api.todoist.com/rest/v1"
+    apiUrl = "https://api.todoist.com/rest/v2"
     webhookEvents = {
         "item:added": "new_task",
         "item:completed": "task_complete",
@@ -119,7 +124,7 @@ class Todoist(Platform):
             + self.state
         )
 
-    def _digest_hmac(self, hmac: hmac.HMAC):
+    def _digest_hmac(self, hmac: hmac.HMAC) -> str:
         return base64.b64encode(hmac.digest()).decode("utf-8")
 
     def _get_check_user_from_webhook(self, data):
@@ -133,7 +138,7 @@ class Todoist(Platform):
 
     def _get_task_from_webhook(self, data):
         # No need to fetch task data as provided in webhook.
-        # "get_task" would not work for completed tasks.
+        # "get_task_data" would not work for completed tasks.
         return data["event_data"]
 
     def _get_id_from_task(self, data):
@@ -174,9 +179,10 @@ class Todoist(Platform):
     def _convert_task_to_platform(self, task: Task) -> dict:
         platformProps = super()._convert_task_to_platform(task)
 
-        if task.properties["due_date"] is not None:
+        dueProp = task.get_property("due_date")
+        if dueProp is not None:
             due, timeIncluded = convert_time_to(
-                task.properties["due_date"], task.properties["due_time_included"]
+                dueProp, task.get_property("due_time_included")
             )
             if timeIncluded:
                 platformProps["due_datetime"] = due
@@ -186,8 +192,8 @@ class Todoist(Platform):
         if "priority" in platformProps:
             platformProps["priority"] = 5 - platformProps["priority"]
 
-        if self in task.lists:
-            platformProps["project_id"] = self.lists[task.lists[self]]
+        if self in task.get_all_lists():
+            platformProps["project_id"] = self.lists[task.get_list(self)]
 
         logger.info(f"task object converted to {self} parameters")
         logger.debug(f"Converted task: {repr(platformProps)}")
@@ -197,10 +203,10 @@ class Todoist(Platform):
         task = super()._convert_task_from_platform(platformProps, new)
 
         # Sets the priority of new tasks to 2 so that 1 is lower than "normal".
-        if new and task.properties["priority"] == 1:
-            task.properties["priority"] = 2
+        if new and task.get_property("priority") == 1:
+            task.set_property("priority", 2)
         # Priority is reversed (When 4 becomes oooone). In Todoist, 4 is highest.
-        task.properties["priority"] = 5 - task.properties["priority"]
+        task.set_property("priority", 5 - task.get_property("priority"))
 
         if "due" in platformProps and platformProps["due"] is not None:
             if (
@@ -210,18 +216,21 @@ class Todoist(Platform):
                 dueDate = platformProps["due"]["datetime"]
             else:
                 dueDate = platformProps["due"]["date"]
-            (
-                task.properties["due_date"],
-                task.properties["due_time_included"],
-            ) = convert_time_from(dueDate)
+
+            print(dueDate)
+
+            dueProp, dueTimeProp = convert_time_from(dueDate)
+            print(dueProp)
+            task.set_property("due_date", dueProp)
+            task.set_property("due_time_included", dueTimeProp)
 
         # Required for type conversions
         convertedTask = Task(
-            properties=task.properties,
-            lists=task.lists,
-            completed=task.completed,
+            properties=task.get_all_properties(),
+            lists=task.get_all_lists(),
+            completed=task.get_all_completed(),
             new=task.new,
-            ids=task.ids,
+            ids=task.get_all_ids(),
         )
 
         logger.info(f"{self} task converted to task object")

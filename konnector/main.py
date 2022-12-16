@@ -1,11 +1,10 @@
-from konnector.konnector import Task, Platform, modify_task, move_task
+from konnector.konnector import Task, Platform, modify_task, move_task, max_days_future
 from konnector.todoist import Todoist
 from konnector.clickup import Clickup
 
 from flask import Flask, request, jsonify, make_response  # render_template
 import logging
 import os
-import time
 from dotenv import load_dotenv
 
 import atexit
@@ -20,7 +19,14 @@ AUTH = os.getenv("AUTH", "False").lower() in ("true", "1")
 ENDPOINT = os.environ["ENDPOINT"]
 app = Flask(__name__)
 app.config["JSONIFY_PRETTYPRINT_REGULAR"] = True
+logger = logging.getLogger("gunicorn.error")
 
+if __name__ == "__main__":
+    app.logger.handlers = logger.handlers
+    # Level set by gunicorn
+    app.logger.setLevel(logger.level)
+
+# Todoist
 todoistEndpoint = "/todoist/webhook"
 todoist = Todoist(
     appEndpoint=ENDPOINT,
@@ -39,6 +45,7 @@ todoist = Todoist(
     state=os.environ["TODOIST_STATE"],
 )
 
+# Clickup
 clickupEndpoint = "/clickup/webhook/call"
 clickup = Clickup(
     ENDPOINT,
@@ -54,20 +61,21 @@ clickup = Clickup(
         "inbox": ["next action", "complete"],
     },
 )
-customFieldTodoist = "550a93a0-6978-4664-be6d-777cc0d7aff6"
+todoistIdInClickup = "550a93a0-6978-4664-be6d-777cc0d7aff6"
 
 
+# Todoist custom funcs
 def get_clickup_id_from_todoist(platform: Platform, platformProps, task: Task):
     """
     Get clickup ID from Todoist task if in the next actions list.
     ID is stored in the Todoist task description.
     """
     # Description in next actions list tasks used to store Clickup ID
-    if task.lists[platform] == "next_actions" and task.properties[
+    if task.get_list(platform) == "next_actions" and task.get_property(
         "description"
-    ] not in [None, ""]:
-        task.ids[clickup] = task.properties["description"]
-        task.properties["description"] = ""
+    ) not in [None, ""]:
+        task.add_id(clickup, task.get_property("description"))
+        task.set_property("description", "")
     return task
 
 
@@ -76,30 +84,9 @@ def add_clickup_id_to_todoist(platform: Platform, task: Task, platformProps):
     Add Clickup ID to Todoist task when copying or moving.
     ID is stored in the Todoist task description.
     """
-    if clickup in task.ids:
-        platformProps["description"] = task.ids[clickup]
-    return platformProps
-
-
-def get_todoist_id_from_clickup(platform: Platform, platformProps, task: Task):
-    """Get todoist ID from custom field in Clickup if available"""
-    if "custom_fields" in platformProps:
-        for customField in platformProps["custom_fields"]:
-            if customField["id"] == customFieldTodoist and "value" in customField:
-                task.ids[todoist] = customField["value"]
-    return task
-
-
-def add_todoist_id_to_clickup(platform: Platform, task: Task, platformProps):
-    """Add todoist ID to clickup tasks when new and copied from Todoist"""
-    if task.new is True and "todoist" in task.ids:
-        platformProps["assignees"] = [platform.userIds[0]]
-        platformProps["custom_fields"] = [
-            {
-                "id": customFieldTodoist,  # Todoist ID
-                "value": str(task.ids[todoist]),
-            }
-        ]
+    clickupId = task.get_id(clickup)
+    if clickupId is not None:
+        platformProps["description"] = clickupId
     return platformProps
 
 
@@ -107,34 +94,44 @@ todoistFromCustomFuncs = [get_clickup_id_from_todoist]
 todoistToCustomFuncs = [add_clickup_id_to_todoist]
 todoist.set_custom_funcs(todoistFromCustomFuncs, todoistToCustomFuncs)
 
+
+# Clickup custom funcs
+def get_todoist_id_from_clickup(platform: Platform, platformProps, task: Task):
+    """Get todoist ID from custom field in Clickup if available"""
+    if "custom_fields" in platformProps:
+        for customField in platformProps["custom_fields"]:
+            if customField["id"] == todoistIdInClickup and "value" in customField:
+                task.add_id(todoist, customField["value"])
+    return task
+
+
+def add_todoist_id_to_clickup(platform: Platform, task: Task, platformProps):
+    """Add todoist ID to clickup task custom field when new and copied from Todoist"""
+    todoistId = task.get_id(todoist)
+    if task.new is True and todoistId is not None:
+        platformProps["assignees"] = [platform.userIds[0]]
+        platformProps["custom_fields"] = [
+            {
+                "id": todoistIdInClickup,  # Todoist ID
+                "value": str(todoistId),
+            }
+        ]
+    return platformProps
+
+
 clickupFromCustomFuncs = [get_todoist_id_from_clickup]
 clickupToCustomFuncs = [add_todoist_id_to_clickup]
 clickup.set_custom_funcs(clickupFromCustomFuncs, clickupToCustomFuncs)
 
-logger = logging.getLogger("gunicorn.error")
-
-if __name__ == "__main__":
-    app.logger.handlers = logger.handlers
-    # Level set by gunicorn
-    app.logger.setLevel(logger.level)
-
-
-def max_days_future(dateIn, days):
-    """Check if a date is within a number of days from today.
-    Returns TRUE or FALSE."""
-    cutoff = int((time.time() + days * 86400) * 1000)
-    if dateIn is None or int(dateIn) > cutoff:
-        logger.debug(f"Date {dateIn} is not before cutoff {cutoff}")
-        return False
-    else:
-        logger.debug(f"Date {dateIn} is before cutoff {cutoff}")
-        return True
-
 
 def next_actions_criteria(clickupTask: Task):
+    """
+    Checks if a Clickup task meets the criteria to be put in
+    Todoist's next actions list.
+    """
     return clickupTask.status == "next action" and (
-        clickupTask.properties["priority"] < 3
-        or max_days_future(clickupTask.properties["due_date"], days=3)
+        clickupTask.get_property("priority") < 3
+        or max_days_future(clickupTask.get_property("due_date"), days=3)
         or clickupTask.subTask is not True
     )
 
@@ -155,6 +152,7 @@ def home():
 # @app.route('/auth/init/<appname>')
 # def auth():
 #   return render_template('form.html', appname=appname)
+# TODO more secure auth system.
 if AUTH is True:
 
     @app.route("/todoist/auth")
@@ -192,7 +190,7 @@ def todoist_webhook():
         IN_LIST = Todoist:Alexa-todo THEN OUT_LIST = Clickup: inbox
         IN_LIST = Todoist:food       THEN OUT_LIST = Clickup: food
       EVENT = task_updated OR task_completed THEN Update associated Clickup task
-        IN_LIST = Todoist:next_action
+        IN_LIST = Todoist:next_action     OUT_LIST = Clickup: inbox
     """
     try:
         (
@@ -250,7 +248,8 @@ def clickup_webhook_received():
             clickupTask,
             clickupEventData,
         ) = clickup.check_request(request)
-        todoistTask, todoistTaskExists = todoist.get_task(clickupTask)
+        todoistTask = todoist.get_task(clickupTask)
+        todoistTaskExists = todoistTask is not None
         if clickupEvent in ["task_updated"]:
             # Clickup task into todoist next_actions.
             # Next action status AND (high priority OR due date < 1 week OR no project.)
@@ -288,6 +287,7 @@ def clickup_webhook_received():
         return make_response(repr(e), 202)  # Response accepted. Not necessarily success
 
 
+# Scheduled actions
 def move_todoist_inbox():
     """
     Loops through todoist "new task" lists (projects) and moves tasks to Clickup.

@@ -85,8 +85,7 @@ class Clickup(Platform):
 
     def _get_task_from_webhook(self, data):
         taskId = data["task_id"]
-        # Does get_task really need to return 2 values? Return None
-        return self.get_task(taskId=taskId, normalized=False)[0]
+        return self._get_task_data(taskId=taskId)
 
     def _get_id_from_task(self, data):
         return str(data["id"])
@@ -128,39 +127,33 @@ class Clickup(Platform):
 
     def _convert_task_from_platform(self, platformProps, new: bool = None) -> Task:
         task = super()._convert_task_from_platform(platformProps, new)
-
-        if "due_date" in task.properties and task.properties["due_date"] is not None:
+        dueProp = task.get_property("due_date")
+        if dueProp is not None:
             # Check if time is included
             # Clickup represents timeless dates at 4am in the local tz
-            dueDate = datetime.datetime.fromtimestamp(
-                task.properties["due_date"] / 1000
-            )
+            dueDate = datetime.datetime.fromtimestamp(dueProp / 1000)
             dueDate = dueDate.replace(tzinfo=tz.gettz("UTC"))
             dueDate = dueDate.astimezone(tz.gettz(TIMEZONE))
             if dueDate.hour == 4 and dueDate.minute == 0:
-                hourDiff = datetime.datetime.fromtimestamp(
-                    task.properties["due_date"] / 1000
-                ).hour
-                task.properties["due_date"] = task.properties["due_date"] - (
-                    hourDiff * 60 * 60 * 1000
-                )
-                task.properties["due_time_included"] = False
+                hourDiff = datetime.datetime.fromtimestamp(dueProp / 1000).hour
+                task.set_property("due_date", dueProp - (hourDiff * 60 * 60 * 1000))
+                task.set_property("due_time_included", False)
             else:
-                task.properties["due_time_included"] = True
+                task.set_property("due_time_included", True)
 
         if "priority" in platformProps:
             if isinstance(platformProps["priority"], dict):  # get_task
-                task.properties["priority"] = platformProps["priority"]["id"]
+                task.set_property("priority", platformProps["priority"]["id"])
             elif platformProps["priority"] is not None:  # create_task response
-                task.properties["priority"] = platformProps["priority"]
+                task.set_property("priority", platformProps["priority"])
 
         # Required for type conversions
         convertedTask = Task(
-            properties=task.properties,
-            lists=task.lists,
-            completed=task.completed,
+            properties=task.get_all_properties(),
+            lists=task.get_all_lists(),
+            completed=task.get_all_completed(),
             new=task.new,
-            ids=task.ids,
+            ids=task.get_all_ids(),
         )
         convertedTask.status = platformProps["status"]["status"]
         convertedTask.subTask = False if platformProps["parent"] is None else True
@@ -183,11 +176,11 @@ class Clickup(Platform):
                 break
         return event, listName, normalizedTask, data
 
-    def get_tasks(self, listName: str, normalized=True) -> list[Task]:
+    def get_tasks(self, listName: str) -> list[Task]:
         # Listname required for clickup
         if listName is None:
             raise Exception("A list name is required to get tasks from Clickup")
-        tasks = super().get_tasks(listName, normalized)
+        tasks = super().get_tasks(listName)
         return tasks
 
     def check_if_task_exists(self, task: Task, listName: str) -> bool:
