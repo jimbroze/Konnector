@@ -67,7 +67,6 @@ def convert_time_to(epochTime, timeIncluded=None):
 
 class Todoist(Platform):
     name = "todoist"
-    # TODO convert to V2
     apiUrl = "https://api.todoist.com/rest/v2"
     webhookEvents = {
         "item:added": "new_task",
@@ -217,10 +216,7 @@ class Todoist(Platform):
             else:
                 dueDate = platformProps["due"]["date"]
 
-            print(dueDate)
-
             dueProp, dueTimeProp = convert_time_from(dueDate)
-            print(dueProp)
             task.set_property("due_date", dueProp)
             task.set_property("due_time_included", dueTimeProp)
 
