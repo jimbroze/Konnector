@@ -5,6 +5,7 @@ import hmac
 import logging
 import time
 import requests
+from typing import Union
 
 logger = logging.getLogger("gunicorn.error")
 
@@ -101,11 +102,11 @@ class Task:
         """
         # Defaults
         self.properties = {
-            "name": "",
+            "name": None,
             "description": None,
             "priority": None,  # 1 highest, 4 lowest. 3 is default.
             "due_date": None,  # time since epoch in ms
-            "due_time_included": False,
+            "due_time_included": None,
         }
         self.new = False
         self.lists = {}  # {Platform: "listName"}
@@ -201,6 +202,16 @@ class Task:
         """Return the list name for a given platform in this task."""
         return self.lists[platform] if platform in self.lists else None
 
+    def add_list(self, platform: Platform, listName: str) -> None:
+        """Add the name of a list, to the task object, that the task is stored in on a
+        productivity platform"""
+        self.lists[platform] = listName
+
+    def remove_list(self, platform: Platform) -> None:
+        """Remove a list, from the task object, that the task is stored in on a
+        productivity platform"""
+        del self.lists[platform]
+
     def get_all_completed(self) -> dict[Platform, bool]:
         """Get the full dictionary of booleans that indicate if the task is completed"""
         return self.completed
@@ -208,11 +219,6 @@ class Task:
     def get_completed(self, platform: Platform) -> bool:
         """Check if this task is completed on a given platform."""
         return self.completed[platform] if platform in self.completed else None
-
-    def add_list(self, platform: Platform, listName: str) -> None:
-        """Add the name of a list, to the task object, that the task is stored in on a
-        productivity platform"""
-        self.lists[platform] = listName
 
     def get_all_ids(self) -> dict[Platform, str]:
         """Get the full dictionary of ids that can be used to fetch this task from
@@ -228,6 +234,10 @@ class Task:
         """Add an ID to the task object that can be used to fetch this task from a
         productivity platform"""
         self.ids[platform] = id
+
+    def remove_id(self, platform: Platform) -> None:
+        """Remove an ID used to fetch this task from a given productivity platform"""
+        del self.ids[platform]
 
     def count_ids(self) -> int:
         """Return the number of ids with a length > 0"""
@@ -685,7 +695,9 @@ class Platform:
         Retrieve a dictionary of properties for a task from the platform's API.
         Either a taskId or a task containing an Id can be used to fetch the task.
         """
-        logger.info(f"Trying to get task data from {self}: {task}")
+        logger.info(
+            f"Trying to get task data from {self}: {taskId if task is None else task}"
+        )
         logger.debug(f"Task to get: {repr(task)}. Task ID: {taskId}")
 
         if taskId is None:
@@ -698,16 +710,16 @@ class Platform:
 
         url, reqType, params = self._get_url_get_task({"taskId": taskId})
         try:
-            retrieved_task = self._send_request(url, reqType, params)
+            retrievedTask = self._send_request(url, reqType, params)
         except requests.exceptions.RequestException as err:
             raise Exception(
                 f"Error retrieving task with ID {taskId} from {self}: {err}"
             )
 
         logger.info(f"{self} task retrieved.")
-        logger.debug(f"Retrieved task dictionary: {retrieved_task}")
+        logger.debug(f"Retrieved task dictionary: {retrievedTask}")
 
-        return retrieved_task
+        return retrievedTask
 
     def get_task(self, task: Task = None, taskId=None) -> Task:
         """
@@ -719,12 +731,16 @@ class Platform:
             taskId: The ID of the task to be retrieved from the platform
 
         Returns:
-            The task retrieved from the platform, converted to a Task object.
+            The task retrieved from the platform, converted to a Task object,
+                or None if the task does not exist
         """
 
-        retrieved_task = self._get_task_data(task, taskId)
-        outTask = self._convert_task_from_platform(retrieved_task)
+        retrievedTask = self._get_task_data(task, taskId)
 
+        if retrievedTask is not None:
+            outTask = self._convert_task_from_platform(retrievedTask)
+        else:
+            outTask = None
         return outTask
 
     def get_tasks(self, listName: str = None) -> list[Task]:
@@ -776,10 +792,6 @@ class Platform:
 
         listId = self.lists[listName]
 
-        # Check if any IDs already exist on the platform
-        if self.check_if_task_exists(task, listName):
-            raise Exception(f'Task "{task}" already exists in {self}')
-
         # Ensure that the list to be added to exists in the task object.
         task.add_list(self, listName)
 
@@ -799,23 +811,7 @@ class Platform:
 
         return newTask
 
-    def update_task(self, task: Task, propertyDiffs: dict = None) -> bool:
-        """
-        Update the properties of an existing task on the platform's API.
-
-        Arguments:
-            task: The task to be updated. If propertyDiffs is not given, this task must
-                contain the new properties to be uploaded.
-            propertyDiffs: A dictionary which ONLY contains new task properties.
-                Not required if the task argument contains the updated properties
-
-        Returns:
-            If the operation was successful
-        """
-
-        logger.info(f"Trying to update task on {self}: {task}")
-        logger.debug(f"Task to update: {repr(task)}. propertyDiffs: {propertyDiffs}")
-
+    def compare_tasks(self, task: Task, propertyDiffs: dict = None) -> dict:
         retrievedTask = self.get_task(task)
         if retrievedTask is None:
             raise Exception(f"Error getting task from {self}: {repr(task)} ")
@@ -826,9 +822,37 @@ class Platform:
 
         # Create new task object with property changes and task IDs.
         # Lists and completed booleans are not included.
-        taskUpdate = Task(properties=propertyDiffs, ids=retrievedTask.get_all_ids())
+        taskUpdate = Task(properties=propertyDiffs, ids=task.get_all_ids())
 
-        platformTaskUpdate = self._convert_task_to_platform(taskUpdate)
+        return self._convert_task_to_platform(taskUpdate)
+
+    def update_task(
+        self, task: Task, propertyDiffs: dict = None, taskDiffs: dict = None
+    ) -> bool:
+        """
+        Update the properties of an existing task on the platform's API.
+
+        Arguments:
+            task: The task to be updated. If propertyDiffs is not given, this task must
+                contain the new properties to be uploaded.
+            propertyDiffs: A dictionary which ONLY contains new task properties.
+                Not required if the task argument contains the updated properties
+            taskDiffs: A dictionary of task properties, in the platform's notation,
+                to be uploaded. If provided, this will skip comparing new properties
+                to the existing ones on the platform.
+
+        Returns:
+            If the operation was successful
+        """
+
+        logger.info(f"Trying to update task on {self}: {task}")
+        logger.debug(f"Task to update: {repr(task)}. propertyDiffs: {propertyDiffs}")
+
+        platformTaskUpdate = (
+            taskDiffs
+            if taskDiffs is not None
+            else self.compare_tasks(task, propertyDiffs)
+        )
 
         taskId = task.get_id(self)
         url, reqType, params = self._get_url_update_task({"taskId": taskId})
@@ -836,7 +860,7 @@ class Platform:
             self._send_request(url, reqType, params, platformTaskUpdate)
         except requests.exceptions.RequestException as err:
             raise Exception(
-                f"Error updating {self} task with details: {propertyDiffs}: {err}"
+                f"Error updating {self} task with details: {platformTaskUpdate}: {err}"
             )
 
         logger.info(f"{self} task updated.")
@@ -904,13 +928,17 @@ class Platform:
 
         return True
 
-    def check_if_task_exists(self, task: Task, listName: str = None) -> bool:
+    def check_if_task_exists(
+        self, task: Task, listName: str = None, returnTask: bool = False
+    ) -> Union[bool, Task]:
         """
         Check if a task ID already exists on the platform's API.
         Doesn't currently check closed tasks
 
         Arguments:
             task (Task): A task containing the ID to be checked.
+            listName (str): A list to search for the task
+            returnTask (bool): If a found task should be returned.
 
         Returns:
             (bool): If the task exists
@@ -929,12 +957,13 @@ class Platform:
                 if retrievedTask.get_id(platform) == platformId:
 
                     logger.info(f"{platform} ID exists in {self} for task: {task}.")
-                    return True
+                    return True if returnTask is False else retrievedTask
 
         logger.info(f"No ID exists in {self} for task: {task}.")
         return False
 
     def add_id(self, task: Task, platform: Platform, id: str):
+        logger.info(f"Adding {platform} id to {self}")
         task.add_id(platform, id)
         return self.update_task(task)
 
@@ -986,16 +1015,29 @@ def move_task(
     for inPlatform, inList in task.get_all_lists().items():
         inLists += f"\n{inPlatform}: {inList}"
 
+    taskLists = task.get_all_lists() if deleteTask is False else {}
+    taskIds = task.get_all_ids() if deleteTask is False else {}
     mergedTask = Task(
         properties=task.get_all_properties(),
-        lists=task.get_all_lists(),
+        lists=taskLists,
         completed=task.get_all_completed(),
         new=False,
-        ids=task.get_all_ids(),
+        ids=taskIds,
     )
 
     for outPlatform, outList in outLists.items():
-        outTask = outPlatform.create_task(task, outList)
+        # Check if any IDs already exist on the platform
+        foundTask = outPlatform.check_if_task_exists(task, outList, returnTask=True)
+        if foundTask is not False:
+            logger.warning(
+                f"Cannot move task. Task already exists in {outPlatform}. Updating task"
+                " instead."
+            )
+            mergedTask.add_list(outPlatform, outList)
+            mergedTask.add_id(outPlatform, foundTask.get_id(outPlatform))
+            outPlatform.update_task(mergedTask)
+            continue
+        outTask = outPlatform.create_task(mergedTask, outList)
 
         mergedTask.add_list(outPlatform, outList)
         mergedTask.add_id(outPlatform, outTask.get_id(outPlatform))
@@ -1006,9 +1048,6 @@ def move_task(
         if deleteTask is True:
             # TODO Possibly add option to remove task, without completing?
             inplatform.complete_task(task)
-        else:
-            mergedTask.add_list(inplatform, task.get_list(inplatform))
-            mergedTask.add_id(outPlatform, task.get_id(inplatform))
 
     return mergedTask
 

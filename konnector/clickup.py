@@ -6,6 +6,8 @@ import logging
 import datetime
 from dateutil import tz
 from dotenv import load_dotenv
+import requests
+from typing import Union
 
 load_dotenv()
 
@@ -183,9 +185,63 @@ class Clickup(Platform):
         tasks = super().get_tasks(listName)
         return tasks
 
-    def check_if_task_exists(self, task: Task, listName: str) -> bool:
+    def update_custom_fields(self, task: Task, taskDiffs: dict = None) -> bool:
+        """
+        Update the custom fields of an existing Clickup task
+
+        Arguments:
+            task: The task to be updated.
+            taskDiffs: A dictionary of task properties, in the platform's notation,
+                to be uploaded. If provided, this will skip comparing new properties
+                to the existing ones on the platform.
+
+        Returns:
+            If the operation was successful
+        """
+
+        logger.debug(f"Trying to update task custom fields on {self}: {repr(task)}.")
+
+        platformTaskUpdate = (
+            taskDiffs if taskDiffs is not None else self.compare_tasks(task)
+        )
+
+        if "custom_fields" not in taskDiffs:
+            raise Exception(f"No custom fields found in: {taskDiffs}")
+
+        taskId = task.get_id(self)
+
+        for customField in taskDiffs["custom_fields"]:
+            try:
+                self._send_request(
+                    f"/task/{taskId}/field/{customField['id']}",
+                    "POST",
+                    {},
+                    {"value": customField["value"]},
+                )
+            except requests.exceptions.RequestException as err:
+                raise Exception(
+                    f"Error updating {self} task with details: {platformTaskUpdate}:"
+                    f" {err}"
+                )
+
+        logger.debug(f"Updated custom fields on {self} task: {repr(task)}")
+
+        return True
+
+    def update_task(self, task: Task, propertyDiffs: dict = None) -> bool:
+        # Clickup requires custom field updates to use a different endpoint
+        taskDiffs = self.compare_tasks(task, propertyDiffs)
+        taskUpdate = super().update_task(task, taskDiffs=taskDiffs)
+        if "custom_fields" in taskDiffs:
+            return self.update_custom_fields(task, taskDiffs=taskDiffs) and taskUpdate
+        else:
+            return taskUpdate
+
+    def check_if_task_exists(
+        self, task: Task, listName: str = None, returnTask: bool = False
+    ) -> Union[bool, Task]:
         # listName required in Clickup
-        return super().check_if_task_exists(task, listName)
+        return super().check_if_task_exists(task, listName, returnTask)
 
     def get_webhook(self, request):
         """Delete the clickup instance's webhook."""

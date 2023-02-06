@@ -75,7 +75,7 @@ def get_clickup_id_from_todoist(platform: Platform, platformProps, task: Task):
         "description"
     ) not in [None, ""]:
         task.add_id(clickup, task.get_property("description"))
-        task.set_property("description", "")
+        task.set_property("description", None)
     return task
 
 
@@ -106,10 +106,10 @@ def get_todoist_id_from_clickup(platform: Platform, platformProps, task: Task):
 
 
 def add_todoist_id_to_clickup(platform: Platform, task: Task, platformProps):
-    """Add todoist ID to clickup task custom field when new and copied from Todoist"""
+    """Add todoist ID to clickup task custom field when copied from Todoist"""
     todoistId = task.get_id(todoist)
-    if task.new is True and todoistId is not None:
-        platformProps["assignees"] = [platform.userIds[0]]
+    if todoistId is not None:
+        # platformProps["assignees"] = [platform.userIds[0]]
         platformProps["custom_fields"] = [
             {
                 "id": todoistIdInClickup,  # Todoist ID
@@ -248,6 +248,7 @@ def clickup_webhook_received():
             clickupTask,
             clickupEventData,
         ) = clickup.check_request(request)
+        # If todoist ID exists in task, get from Todoist
         todoistTask = todoist.get_task(clickupTask)
         todoistTaskExists = todoistTask is not None
         if clickupEvent in ["task_updated"]:
@@ -260,6 +261,7 @@ def clickup_webhook_received():
                     todoistTask = move_task(
                         clickupTask, {todoist: "next_actions"}, deleteTask=False
                     )
+
                     clickup.add_id(clickupTask, todoist, todoistTask.get_id(todoist))
                 else:
                     logger.info(
