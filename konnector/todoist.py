@@ -195,7 +195,7 @@ class Todoist(Platform):
             platformProps["project_id"] = self.lists[task.get_list(self)]
 
         logger.info(f"task object converted to {self} parameters")
-        logger.debug(f"Converted task: {repr(platformProps)}")
+        logger.debug(f"Converted task: {platformProps}")
         return platformProps
 
     def _convert_task_from_platform(self, platformProps, new: bool = None) -> Task:
@@ -230,7 +230,7 @@ class Todoist(Platform):
         )
 
         logger.info(f"{self} task converted to task object")
-        logger.debug(f"Converted task: {convertedTask}")
+        logger.debug(f"Converted task: {repr(convertedTask)}")
         return convertedTask
 
     def check_request(self, request):

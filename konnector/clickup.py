@@ -38,7 +38,7 @@ class Clickup(Platform):
         accessToken: str,
         clientId: str,
         secret: str,
-        userIds: list,
+        userIds: list[str],
         workspace: str,
         newTaskLists: list = None,
         folder: str = None,
@@ -137,8 +137,7 @@ class Clickup(Platform):
             dueDate = dueDate.replace(tzinfo=tz.gettz("UTC"))
             dueDate = dueDate.astimezone(tz.gettz(TIMEZONE))
             if dueDate.hour == 4 and dueDate.minute == 0:
-                hourDiff = datetime.datetime.fromtimestamp(dueProp / 1000).hour
-                task.set_property("due_date", dueProp - (hourDiff * 60 * 60 * 1000))
+                task.set_property("due_date", dueProp - (4 * 60 * 60 * 1000))
                 task.set_property("due_time_included", False)
             else:
                 task.set_property("due_time_included", True)

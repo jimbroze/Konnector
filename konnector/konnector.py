@@ -704,7 +704,7 @@ class Platform:
             if task is None:
                 raise Exception(f"No {self} task or ID given to get task.")
             if task.get_id(self) is None:
-                logger.debug(f"{self} ID does not exist in the task: {task}")
+                logger.info(f"{self} ID does not exist in the task: {task}")
                 return None
             taskId = task.get_id(self)
 
@@ -813,6 +813,9 @@ class Platform:
 
     def compare_tasks(self, task: Task, propertyDiffs: dict = None) -> dict:
         retrievedTask = self.get_task(task)
+        logger.info(f"Comparing {self} tasks")
+        logger.debug(f"Modified task: {repr(task)}")
+        logger.debug(f"Retrieved task: {repr(retrievedTask)}")
         if retrievedTask is None:
             raise Exception(f"Error getting task from {self}: {repr(task)} ")
 
@@ -823,6 +826,7 @@ class Platform:
         # Create new task object with property changes and task IDs.
         # Lists and completed booleans are not included.
         taskUpdate = Task(properties=propertyDiffs, ids=task.get_all_ids())
+        logger.debug(repr(taskUpdate))
 
         return self._convert_task_to_platform(taskUpdate)
 
@@ -955,7 +959,6 @@ class Platform:
         for platform, platformId in task.get_all_ids().items():
             for retrievedTask in retrievedTasks:
                 if retrievedTask.get_id(platform) == platformId:
-
                     logger.info(f"{platform} ID exists in {self} for task: {task}.")
                     return True if returnTask is False else retrievedTask
 
@@ -1081,7 +1084,6 @@ def modify_task(
     # Loop through out lists and modify tasks. Task must already have outPlatforms ids
     results = {}
     for outPlatform, outList in outLists.items():
-
         logger.debug(
             f"Attempting to modify task in {outPlatform}-{outList}. "
             f"Input lists are: {inLists}"
