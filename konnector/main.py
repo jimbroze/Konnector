@@ -207,6 +207,8 @@ def todoist_webhook():
                 clickupList = "food_log"
             else:
                 raise Exception(f"Invalid Todoist list for new task: {todoistList}")
+            if todoistTask.get_completed(todoist):
+                raise Exception(f"Todoist task is not new: {todoistTask}")
             move_task(todoistTask, {clickup: clickupList}, deleteTask=True)
         elif todoistEvent in [
             "task_complete",
