@@ -7,6 +7,7 @@ import requests
 from typing import Union
 
 from konnector.lib.task.task import Task
+from konnector.lib.helpers import reverse_lookup
 
 logger = logging.getLogger("gunicorn.error")
 

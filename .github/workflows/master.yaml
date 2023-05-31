@@ -1,0 +1,83 @@
+name: Production - Konnector
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+      - name: Set up Python dependencies
+        uses: Gr1N/setup-poetry@v8
+      - run: poetry --version
+      - name: Format with black
+        run: poetry run black konnector tests --preview
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names.  The GitHub editor is 127 chars wide
+          poetry run flake8 --count --select=E9,F63,F7,F82 --max-line-length=88 --extend-ignore=E203 --show-source --statistics konnector
+          # exit-zero treats all errors as warnings.
+          poetry run flake8 --count --exit-zero --max-line-length=88 --extend-ignore=E203 --statistics konnector
+      # - name: Test with pytest
+      #   run: poetry run pytest -vv
+
+  # build:
+  #   runs-on: ubuntu-latest
+  #   needs: [test]
+  #   steps:
+  #   - uses: actions/checkout@v3
+  #   - name: Build the Docker image
+  #     run: docker build . --file Dockerfile --tag konnector:$(date +%s)
+
+  # deploy:
+  #   runs-on: self-hosted
+  #   needs: [build]
+  #   defaults:
+  #     run:
+  #       working-directory: ../konnector
+  #   steps:
+  #     # - run: git pull origin main
+  #     #       - run: |
+  #     #           git config --global user.name 'Jimbroze'
+  #     #           git config --global user.email 'jimbroze@users.noreply.github.com'
+  #     #           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+  #     #           git push origin dietpi
+  #     #           git remote set-url origin https://github.com/jimbroze/Jarvis.git
+  #     - uses: actions/checkout@v3
+  #     - name: Build the Docker image
+  #       run: docker build . --file Dockerfile --tag konnector:$(date +%s)
+  #     - name: Run the Docker image
+  #       run: sh docker.sh
+
+  test_build_deploy:
+    runs-on: self-hosted
+    needs: [test]
+    defaults:
+      run:
+        working-directory: ../konnector
+    steps:
+      - uses: actions/checkout@v3
+      - name: Format with black
+        run: poetry run black konnector tests --preview
+      - name: Lint with flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names.  The GitHub editor is 127 chars wide
+          poetry run flake8 --count --select=E9,F63,F7,F82 --max-line-length=88 --extend-ignore=E203 --show-source --statistics konnector
+          # exit-zero treats all errors as warnings.
+          poetry run flake8 --count --exit-zero --max-line-length=88 --extend-ignore=E203 --statistics konnector
+      - name: Test with pytest
+        run: poetry run pytest -vv
+      - name: Stop the Docker container
+        run: docker stop konnector
+      - name: Build the Docker image
+        run: docker build . --file Dockerfile --tag konnector:$(date +%s)
+      - name: Start the Docker container
+        run: sh docker.sh
