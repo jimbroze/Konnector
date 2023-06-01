@@ -62,7 +62,7 @@ jobs:
     needs: [test]
     defaults:
       run:
-        working-directory: ../konnector
+        working-directory: /home/jimbroze/konnector
     steps:
       - uses: actions/checkout@v3
       - name: Format with black
