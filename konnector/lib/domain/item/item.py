@@ -10,7 +10,7 @@ logger = logging.getLogger("gunicorn.error")
 
 class Item(ABC):
     """
-    A class to represent an item in a list.
+    An item in a list.
 
     ...
 
