@@ -3,6 +3,6 @@ from datetime import datetime
 
 
 @dataclass(frozen=True)
-class ActivityDateTime:
+class ItemDateTime:
     date_time: datetime
     time_included: bool

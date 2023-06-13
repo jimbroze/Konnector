@@ -1,0 +1,40 @@
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from . import Item
+
+
+class ItemRepository(ABC):
+    """
+    A class to represent a productivity platform and access its API.
+
+    ...
+
+    Attributes
+    ----------
+    name : str =  ""
+        What the platform is called
+
+    """
+
+    name = ""
+
+    @abstractmethod
+    def get_items(self, list_name: Optional[str] = None) -> list[Item]:
+        pass
+
+    @abstractmethod
+    def get_item(self, item: Item) -> Item:
+        pass
+
+    @abstractmethod
+    def create_item(self, item: Item, list_name: Optional[str] = None) -> Item:
+        pass
+
+    @abstractmethod
+    def update_item(self, item: Item) -> Item:
+        pass
+
+    @abstractmethod
+    def delete_item(self, item: Item) -> bool:
+        pass

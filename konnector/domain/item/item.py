@@ -2,57 +2,58 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import logging
 
-from activity_date_time import ActivityDateTime
+from item_date_time import ItemDateTime
+from item_priority import ItemPriority
 
 logger = logging.getLogger("gunicorn.error")
 
 
-class Activity(ABC):
+class Item(ABC):
     """
-    A class to represent an activity in a list.
+    A class to represent an item in a list.
 
     ...
 
     Attributes
     ----------
     id : str
-        A unique identifier for the activity.
+        A unique identifier for the item
     name : str
-        The name of the activity.
+        The name of the item
     description : str
-        A description of the activity.
-    priority : int
-        The activity's importance. 1 is highest, 4 is lowest, 3 is default.
-    start_datetime : str
-        When the activity starts
-    end_datetime : str
-        When the activity ends
+        A description of the item
+    priority : ItemPriority
+        The item's importance
+    start_datetime : ItemDateTime
+        When the item starts
+    end_datetime : ItemDateTime
+        When the item ends
     """
 
     def __init__(
         self,
         id: str = None,
-        name: dict = None,
-        description: bool = None,
-        priority: int = None,
-        start_datetime: ActivityDateTime = None,
-        end_datetime: ActivityDateTime = None,
+        name: str = None,
+        description: str = None,
+        priority: ItemPriority = None,
+        start_datetime: ItemDateTime = None,
+        end_datetime: ItemDateTime = None,
     ):
         """
         Parameters
         ----------
         id : str
-            A unique identifier for the activity.
+            A unique identifier for the item
         name : str
-            The name of the activity.
+            The name of the item
         description : str
-            A description of the activity.
-        priority : int
-            The activity's importance. 1 is highest, 4 is lowest, 3 is default.
-        start_datetime : str
-            When the activity starts
-        end_datetime : str
-            When the activity ends
+            A description of the item
+        priority : ItemPriority
+            The item's importance
+        start_datetime : ItemDateTime
+            When the item starts
+        end_datetime : ItemDateTime
+            When the item ends
         """
 
         if id is not None:
@@ -73,7 +74,7 @@ class Activity(ABC):
 
     def __repr__(self):
         return (
-            f"Activity(name={self.name}, description={self.description},"
+            f"Item(name={self.name}, description={self.description},"
             f" priority={self.priority}, start_datetime={self.start_datetime},"
             f" end_datetime={self.end_datetime})"
         )
