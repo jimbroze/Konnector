@@ -1,18 +1,21 @@
+from konnector.main import clickup
+from konnector.konnector import Task
+
 import pytest
 from pytest_lazyfixture import lazy_fixture
 
 CLICKUP_IN_LIST = "inbox"
 
 
-# @pytest.fixture(scope="function")
-def clickup_item_response():
+@pytest.fixture(scope="function")
+def clickup_dict():
     # Taken from Actual API response
     return {
         "id": "38nyk68",
         "custom_id": None,
         "name": "Ask Charles about 3d printer",
-        "text_content": "This is a description",
-        "description": "This is a description",
+        "text_content": None,
+        "description": None,
         "status": {
             "id": "c17398998_c17398979_c13022684_3ejH6eMv",
             "status": "next action",
@@ -69,7 +72,7 @@ def clickup_item_response():
             "orderindex": "2",
         },
         "due_date": "1670558400000",
-        "start_date": "1670490000000",
+        "start_date": None,
         "points": None,
         "time_estimate": None,
         "time_spent": 0,
@@ -109,3 +112,26 @@ def clickup_item_response():
 
 
 clickupDict = lazy_fixture("clickup_dict")
+
+
+@pytest.fixture(scope="function")
+def task_clickup():
+    task = Task(
+        properties={
+            "name": "Ask Charles about 3d printer",
+            "description": None,
+            "priority": 2,
+            "due_date": 1670544000000,
+            "due_time_included": False,
+        },
+        new=False,
+        lists={
+            clickup: CLICKUP_IN_LIST,
+        },
+        completed={clickup: False},
+        ids={clickup: "38nyk68"},
+    )
+    return task
+
+
+taskClickup = lazy_fixture("task_todoist")

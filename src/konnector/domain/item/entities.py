@@ -1,11 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-import logging
 
-from item_date_time import ItemDateTime
-from item_priority import ItemPriority
-
-logger = logging.getLogger("gunicorn.error")
+from lib.domain.item.value_objects import ItemDateTime, ItemPriority
 
 
 class Item(ABC):

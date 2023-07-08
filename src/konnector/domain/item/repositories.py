@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from . import Item
+from lib.domain.item.entities import Item
 
 
 class ItemRepository(ABC):
@@ -21,20 +21,21 @@ class ItemRepository(ABC):
 
     @abstractmethod
     def get_items(self, list_name: Optional[str] = None) -> list[Item]:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
-    def get_item(self, item: Item) -> Item:
-        pass
+    def get_item_by_id(self, item_id: str) -> Optional[Item]:
+        raise NotImplementedError
 
     @abstractmethod
-    def create_item(self, item: Item, list_name: Optional[str] = None) -> Item:
-        pass
+    def save_item(self, item: Item, list_name: Optional[str] = None) -> Item:
+        raise NotImplementedError
 
+    # TODO should this be optional return?
     @abstractmethod
     def update_item(self, item: Item) -> Item:
-        pass
+        raise NotImplementedError
 
     @abstractmethod
-    def delete_item(self, item: Item) -> bool:
-        pass
+    def delete_item_by_id(self, item: Item) -> bool:
+        raise NotImplementedError

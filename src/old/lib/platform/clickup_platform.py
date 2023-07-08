@@ -1,4 +1,4 @@
-from konnector.konnector import Task, Platform
+from .platform import Platform
 
 import os
 import hmac
