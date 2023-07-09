@@ -149,7 +149,7 @@ class ClickupRepository:
         logger.debug(f"Clickup item retrieved. Item: ${clickup_item}")
         return clickup_item
 
-    def save_item(self, item: ClickupItem, listName: str) -> ClickupItem:
+    def create_item(self, item: ClickupItem, listName: str) -> ClickupItem:
         """
         Create a new item on Clickup's API from a item object.
 
