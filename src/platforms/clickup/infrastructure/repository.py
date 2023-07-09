@@ -327,13 +327,19 @@ class ClickupItemMapper:
             id=clickup_response["id"],
             name=clickup_response["name"],
             description=clickup_response["description"],
-            priority=ClickupPriority(clickup_response["priority"]["id"]),
+            priority=ClickupPriority(clickup_response["priority"]["id"])
+            if clickup_response["priority"] is not None
+            else None,
             start_datetime=ClickupDatetime.from_time_unknown(
                 clickup_response["start_date"], localTz
-            ),
+            )
+            if clickup_response["start_date"] is not None
+            else None,
             end_datetime=ClickupDatetime.from_time_unknown(
                 clickup_response["due_date"], localTz
-            ),
+            )
+            if clickup_response["due_date"] is not None
+            else None,
             created_datetime=ClickupDatetime(clickup_response["date_created"], True),
             updated_datetime=ClickupDatetime(clickup_response["date_updated"], True),
             status=clickup_response["status"]["status"],
@@ -345,16 +351,23 @@ class ClickupItemMapper:
 
     @staticmethod
     def from_entity(item: ClickupItem) -> dict:
-        return {
+        clickup_dict = {
             "name": item.name,
-            "description": item.description,
-            "priority": item.priority.to_int(),
-            "start_date": item.start_datetime.to_int(),
-            "start_date_time": item.start_datetime.time_included,
-            "due_date": item.end_datetime.to_int(),
-            "due_date_time": item.end_datetime.time_included,
-            "status": item.status,
-            "custom_fields": [
-                {"id": id, "value": value} for (id, value) in item.custom_fields.items()
-            ],
         }
+        if item.description:
+            clickup_dict["description"] = item.description
+        if item.priority:
+            clickup_dict["priority"] = item.priority.to_int()
+        if item.start_datetime:
+            clickup_dict["start_date"] = item.start_datetime.to_int()
+            clickup_dict["start_date_time"] = item.start_datetime.time_included
+        if item.end_datetime:
+            clickup_dict["due_date"] = item.end_datetime.to_int()
+            clickup_dict["due_date_time"] = item.end_datetime.time_included
+        if item.status:
+            clickup_dict["status"] = item.status
+        if item.custom_fields:
+            clickup_dict["custom_fields"] = [
+                {"id": id, "value": value} for (id, value) in item.custom_fields.items()
+            ]
+        return clickup_dict
