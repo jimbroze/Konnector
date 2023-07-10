@@ -1,10 +1,10 @@
 from __future__ import annotations
-from attrs import frozen, field
+from attrs import define, field
 from datetime import datetime, date, time
 from pytz import timezone
 
 
-@frozen
+@define
 class ClickupDatetime:
     timestamp: int = field(converter=int)
     time_included: bool
@@ -27,14 +27,26 @@ class ClickupDatetime:
 
     @classmethod
     def from_date(cls, date_obj: date) -> ClickupDatetime:
-        dt = datetime.combine(date_obj, time.min.replace(hour=4))
+        dt = datetime.combine(date_obj, time.min.replace(hour=4), timezone("UTC"))
         return cls(dt.timestamp() * 1000, False)
 
     @classmethod
     def from_datetime(
         cls, datetime_obj: datetime, time_included: bool = None
     ) -> ClickupDatetime:
-        return cls(int(datetime_obj.timestamp()) * 1000, time_included)
+        utc_dt = datetime_obj.astimezone(timezone("UTC"))
+        return cls(int(utc_dt.timestamp()) * 1000, time_included)
+
+    def __attrs_post_init__(self) -> ClickupDatetime:
+        if self.time_included is False:
+            self.remove_time()
+
+    def remove_time(self) -> ClickupDatetime:
+        dt = datetime.utcfromtimestamp(self.timestamp / 1000).replace(
+            hour=4, minute=0, second=0, microsecond=0
+        )
+        self.timestamp = dt.timestamp() * 1000
+        return self
 
     def to_int(self) -> int:
         return self.timestamp

@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from pytz import timezone
+from pytz import timezone, utc
 import pytest
 
 from platforms.clickup.domain.datetime import ClickupDatetime
@@ -19,10 +19,10 @@ class TestClickupRepository:
             priority=ClickupPriority(2),
             status="next action",
             start_datetime=ClickupDatetime.from_datetime(
-                datetime(2022, 12, 8, 9, 0, 0), True
+                datetime(2022, 12, 8, 9, 0, 0, 0, utc), True
             ),
             end_datetime=ClickupDatetime.from_datetime(
-                datetime(2022, 12, 10, 9, 0, 0), False
+                datetime(2022, 12, 10, 9, 0, 0, 0, utc), False
             ),
         )
 
@@ -57,10 +57,10 @@ class TestClickupRepository:
             priority=ClickupPriority(2),
             status="next action",
             start_datetime=ClickupDatetime.from_datetime(
-                datetime(2022, 12, 8, 9, 0, 0), True
+                datetime(2022, 12, 8, 9, 0, 0, 0, utc), True
             ),
             end_datetime=ClickupDatetime.from_datetime(
-                datetime(2022, 12, 10, 9, 0, 0), False
+                datetime(2022, 12, 10, 9, 0, 0, 0, utc), False
             ),
         )
 
@@ -75,11 +75,10 @@ class TestClickupRepository:
         assert created_item.priority == ClickupPriority(2)
         assert created_item.status == "next action"
         assert created_item.start_datetime == ClickupDatetime.from_datetime(
-            datetime(2022, 12, 8, 9, 0, 0), True
+            datetime(2022, 12, 8, 9, 0, 0, 0, utc), True
         )
-        # FIXME will not be identical due to time. Need to removed time on creation?
         assert created_item.end_datetime == ClickupDatetime.from_datetime(
-            datetime(2022, 12, 10, 9, 0, 0), False
+            datetime(2022, 12, 10, 9, 0, 0, 0, utc), False
         )
 
         # WHEN
@@ -103,11 +102,11 @@ class TestClickupRepository:
         assert retrieved_item.priority == ClickupPriority(2)
         assert retrieved_item.status == "next action"
         assert retrieved_item.start_datetime == ClickupDatetime.from_datetime(
-            datetime(2022, 12, 8, 9, 0, 0), True
+            datetime(2022, 12, 8, 9, 0, 0, 0, utc), True
         )
         # FIXME will not be identical due to time. Need to removed time on creation?
         assert retrieved_item.end_datetime == ClickupDatetime.from_datetime(
-            datetime(2022, 12, 10, 9, 0, 0), False
+            datetime(2022, 12, 10, 9, 0, 0, 0, utc), False
         )
 
     @pytest.mark.integration
@@ -133,10 +132,10 @@ class TestClickupRepository:
             priority=ClickupPriority(4),
             status="complete",
             start_datetime=ClickupDatetime.from_datetime(
-                datetime(2023, 12, 8, 9, 0, 0), True
+                datetime(2023, 12, 8, 9, 0, 0, 0, utc), True
             ),
             end_datetime=ClickupDatetime.from_datetime(
-                datetime(2023, 12, 10, 9, 0, 0), False
+                datetime(2023, 12, 10, 9, 0, 0, 0, utc), False
             ),
         )
 
@@ -151,8 +150,8 @@ class TestClickupRepository:
         assert updated_item.priority == ClickupPriority(4)
         assert updated_item.status == "complete"
         assert updated_item.start_datetime == ClickupDatetime.from_datetime(
-            datetime(2023, 12, 8, 9, 0, 0), True
+            datetime(2023, 12, 8, 9, 0, 0, 0, utc), True
         )
         assert updated_item.end_datetime == ClickupDatetime.from_datetime(
-            datetime(2023, 12, 10, 9, 0, 0), False
+            datetime(2023, 12, 10, 9, 0, 0, 0, utc), False
         )

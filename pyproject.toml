@@ -31,4 +31,8 @@ build-backend = "poetry.core.masonry.api"
 addopts = [
     "--import-mode=importlib",
 ]
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+]
 pythonpath = ["src"]

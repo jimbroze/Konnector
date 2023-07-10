@@ -1,14 +1,11 @@
-from attrs import frozen, field
+from attrs import frozen, field, validators
 
 
 @frozen
 class ClickupPriority:
-    priority: int = field(default=3, converter=int)
-
-    @priority.validator
-    def priority_between_values(self, attribute, value):
-        if not 0 < value <= 4:
-            raise ValueError("Value should be between 0 and 4 inclusive")
+    priority: int = field(
+        default=3, converter=int, validator=[validators.ge(1), validators.le(4)]
+    )
 
     def to_int(self) -> int:
         return self.priority
