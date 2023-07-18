@@ -50,6 +50,24 @@ class TestClickupItemMapper:
         assert clickup_item.custom_fields == {}
 
     @pytest.mark.unit
+    def test_to_entity_handles_empty_custom_fields(self):
+        # GIVEN
+        tz = timezone("Europe/London")
+        api_response = clickup_empty_custom_fields
+
+        # WHEN
+        clickup_item = ClickupItemMapper.to_entity(api_response, tz)
+
+        # THEN
+        assert isinstance(clickup_item, ClickupItem)
+        assert clickup_item.priority is None
+        assert clickup_item.start_datetime is None
+        assert clickup_item.end_datetime is None
+        assert clickup_item.custom_fields == {
+            "f1e52dc5-0b71-4d4b-86f1-2d6c45d31b01": None,
+        }
+
+    @pytest.mark.unit
     def test_from_entity_converts_entity_to_API_Data(self):
         # GIVEN
         clickup_item = ClickupItem(
@@ -254,6 +272,83 @@ clickup_empty_response = {
     "time_estimate": None,
     "time_spent": 0,
     "custom_fields": [],
+    "dependencies": [],
+    "linked_tasks": [],
+    "team_id": "2193273",
+    "url": "https://app.clickup.com/t/38nyk68",
+    "sharing": {
+        "public": False,
+        "public_share_expires_on": None,
+        "public_fields": [],
+        "token": None,
+        "seo_optimized": False,
+    },
+    "permission_level": "create",
+    "list": {"id": "38260663", "name": "GTD", "access": True},
+    "project": {
+        "id": "17398998",
+        "name": "To Do - GTD",
+        "hidden": False,
+        "access": True,
+    },
+    "folder": {
+        "id": "17398998",
+        "name": "To Do - GTD",
+        "hidden": False,
+        "access": True,
+    },
+    "space": {"id": "2294578"},
+    "attachments": [],
+}
+
+clickup_empty_custom_fields = {
+    "id": "38nyk68",
+    "custom_id": None,
+    "name": "test",
+    "text_content": "",
+    "description": "",
+    "status": {
+        "id": "c17398998_c17398979_c13022684_3ejH6eMv",
+        "status": "next action",
+        "color": "#02d49b",
+        "orderindex": 2,
+        "type": "custom",
+    },
+    "orderindex": "26443.00000000000000000000000000000000",
+    "date_created": "1670355679867",
+    "date_updated": "1670422406403",
+    "date_closed": None,
+    "date_done": None,
+    "archived": False,
+    "creator": {
+        "id": 2511898,
+        "username": "stdstds",
+        "color": "#006063",
+        "email": "rsdtrstdstdt@gmail.com",
+        "profilePicture": None,
+    },
+    "assignees": [],
+    "watchers": [],
+    "checklists": [],
+    "tags": [],
+    "parent": None,
+    "priority": None,
+    "due_date": None,
+    "start_date": None,
+    "points": None,
+    "time_estimate": None,
+    "time_spent": 0,
+    "custom_fields": [
+        {
+            "id": "f1e52dc5-0b71-4d4b-86f1-2d6c45d31b01",
+            "name": "Energy",
+            "type": "emoji",
+            "type_config": {"count": 5, "code_point": "1f3c3 200d 2642 fe0f"},
+            "date_created": "1606936669799",
+            "hide_from_guests": False,
+            "required": False,
+        },
+    ],
     "dependencies": [],
     "linked_tasks": [],
     "team_id": "2193273",

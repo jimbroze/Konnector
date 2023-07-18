@@ -1,14 +1,14 @@
 from typing import Optional
 from pytz import timezone
+import logging
+from dotenv import load_dotenv
+import requests
 
 # from konnector.domain.item.repositories import ItemRepository
 from platforms.clickup.domain.datetime import ClickupDatetime
 from platforms.clickup.domain.priority import ClickupPriority
 from platforms.clickup.domain.item import ClickupItem
 
-import logging
-from dotenv import load_dotenv
-import requests
 
 load_dotenv()
 
@@ -20,20 +20,9 @@ class ClickupRepository:
     name = "clickup"
     apiUrl = "https://api.clickup.com/api/v2"
 
-    def __init__(
-        self,
-        lists: dict,
-        accessToken: str,
-    ):
-        # Defaults
-        self.accessToken = ""
-        self.clientId = ""
-        self.secret = ""
-
+    def __init__(self, accessToken: str, localTz: timezone):
         self.accessToken = accessToken
-
-        self.lists = lists
-
+        self.localTz = localTz
         self.headers = {
             "Authorization": accessToken,
             "Content-Type": "application/json",
@@ -82,12 +71,12 @@ class ClickupRepository:
         else:
             return
 
-    def get_items(self, list_name: str) -> list[ClickupItem]:
+    def get_items(self, list_id: str) -> list[ClickupItem]:
         """
         Retrieve a list of items from the platform's API.
 
         Arguments:
-            list_name: a list that items should be taken from
+            list_id: The ID of a list that items should be taken from
 
         Returns:
             A list of (Item) objects
@@ -98,16 +87,13 @@ class ClickupRepository:
         # if list_name is None:
         #     raise Exception("A list name is required to get items from Clickup")
 
-        logger.debug(f"Trying to get items from Clickup in list {list_name}")
-
-        list_id = self.lists[list_name]
         try:
             retrieved_items = self._send_request(f"/list/{list_id}/task", "GET", {})[
                 "tasks"
             ]
         except requests.exceptions.HTTPError as err:
             if err.response.status_code == 404:
-                logger.warning(f"No Clickup items found in list: {list_name}")
+                logger.warning(f"No Clickup items found in list: {list_id}")
                 return []
             raise
         except requests.exceptions.RequestException:
@@ -115,7 +101,7 @@ class ClickupRepository:
 
         logger.debug(f"{len(retrieved_items)} Clickup tasks retrieved.")
         return [
-            ClickupItemMapper.to_entity(retrieved_item)
+            ClickupItemMapper.to_entity(retrieved_item, self.localTz)
             for retrieved_item in retrieved_items
         ]
 
@@ -144,26 +130,24 @@ class ClickupRepository:
         except requests.exceptions.RequestException:
             raise
 
-        clickup_item = ClickupItemMapper.to_entity(retrieved_item)
+        clickup_item = ClickupItemMapper.to_entity(retrieved_item, self.localTz)
 
         logger.debug(f"Clickup item retrieved. Item: ${clickup_item}")
         return clickup_item
 
-    def create_item(self, item: ClickupItem, listName: str) -> ClickupItem:
+    def create_item(self, item: ClickupItem, list_id: str) -> ClickupItem:
         """
         Create a new item on Clickup's API from a item object.
 
         Arguments:
             item: The item object to be sent to the API
-            listName: A list that the item should be added to
+            list_id: The ID of a list that the item should be added to
 
         Returns:
             The created item
         """
 
-        logger.debug(f"Trying to create item on Clickup list: {listName}. Item: {item}")
-
-        list_id = self.lists[listName]
+        logger.debug(f"Trying to create item in Clickup list: {list_id}. Item: {item}")
 
         item_properties = ClickupItemMapper.from_entity(item)
 
@@ -174,7 +158,7 @@ class ClickupRepository:
         except requests.exceptions.RequestException:
             raise
 
-        clickup_item = ClickupItemMapper.to_entity(created_item)
+        clickup_item = ClickupItemMapper.to_entity(created_item, self.localTz)
 
         logger.debug(f"Clickup item created. Item: {clickup_item}")
         return clickup_item
@@ -214,7 +198,7 @@ class ClickupRepository:
         else:
             return updated_item
 
-    def delete_item_by_id(self, item: ClickupItem) -> bool:
+    def delete_item_by_id(self, item_id: ClickupItem) -> bool:
         """
         Delete a item on Clickup's API.
 
@@ -225,24 +209,19 @@ class ClickupRepository:
             If the operation was successful
         """
 
-        logger.debug(f"Trying to delete item from Clickup. Item: {item}")
-
-        if item.id is None:
-            raise Exception(
-                f"Cannot delete item from Clickup without ID. Item: {item} "
-            )
+        logger.debug(f"Trying to delete item from Clickup. Item_id: {item_id}")
 
         try:
-            self._send_request(f"/item/{item.id}", "DELETE", {})
+            self._send_request(f"/item/{item_id}", "DELETE", {})
         except requests.exceptions.HTTPError as err:
             if err.response.status_code == 404:
-                logger.warning(f"No Clickup item found with ID: {item.id}")
+                logger.warning(f"No Clickup item found with ID: {item_id}")
                 return False
             raise
         except requests.exceptions.RequestException:
             raise
 
-        logger.debug(f"Clickup item deleted. Item: {item}")
+        logger.debug(f"Clickup item deleted. Item_id: {item_id}")
 
         return True
 
@@ -278,7 +257,7 @@ class ClickupRepository:
         except requests.exceptions.RequestException:
             raise
 
-        clickup_item = ClickupItemMapper.to_entity(updated_item)
+        clickup_item = ClickupItemMapper.to_entity(updated_item, self.localTz)
         logger.debug(f"Clickup item completed. Item: {clickup_item}")
 
         return clickup_item
@@ -344,7 +323,7 @@ class ClickupItemMapper:
             updated_datetime=ClickupDatetime(clickup_response["date_updated"], True),
             status=clickup_response["status"]["status"],
             custom_fields={
-                field["id"]: field["value"]
+                field["id"]: (field["value"] if "value" in field else None)
                 for field in clickup_response["custom_fields"]
             },
         )

@@ -1,6 +1,8 @@
 from datetime import datetime, date
 from pytz import timezone, utc
 import pytest
+import os
+from dotenv import load_dotenv
 
 from platforms.clickup.domain.datetime import ClickupDatetime
 from platforms.clickup.domain.priority import ClickupPriority
@@ -8,11 +10,24 @@ from platforms.clickup.domain.item import ClickupItem
 from platforms.clickup.infrastructure.repository import ClickupRepository
 
 
+load_dotenv()
+
+CLICKUP_TOKEN = os.environ["CLICKUP_TOKEN"]
+
+
 class TestClickupRepository:
     @pytest.fixture
-    def clickup_item(self):
+    def clickup_instance(self):
         # SETUP
-        clickup_list = ""
+        clickup_repo = ClickupRepository(CLICKUP_TOKEN, timezone("Europe/London"))
+
+        # YIELD
+        yield clickup_repo
+
+    @pytest.fixture
+    def clickup_item(self, clickup_instance: ClickupRepository):
+        # SETUP
+        clickup_list = "38260663"
         clickup_item = ClickupItem(
             name="test item",
             description="Test Description.",
@@ -26,7 +41,7 @@ class TestClickupRepository:
             ),
         )
 
-        created_item = ClickupRepository.create_item(clickup_item, clickup_list)
+        created_item = clickup_instance.create_item(clickup_item, clickup_list)
 
         # YIELD
         yield created_item
@@ -35,12 +50,12 @@ class TestClickupRepository:
         ClickupRepository.delete_item_by_id(created_item.id)
 
     @pytest.mark.integration
-    def test_get_items(self):
+    def test_get_items(self, clickup_instance: ClickupRepository):
         # GIVEN
-        clickup_list = ""
+        clickup_list = "38260663"
 
         # WHEN
-        items = ClickupRepository.get_items(clickup_list)
+        items = clickup_instance.get_items(clickup_list)
 
         # THEN
         assert len(items) > 0
@@ -48,9 +63,9 @@ class TestClickupRepository:
             assert isinstance(item, ClickupItem)
 
     @pytest.mark.integration
-    def test_create_and_delete_item(self):
+    def test_create_and_delete_item(self, clickup_instance: ClickupRepository):
         # GIVEN
-        clickup_list = ""
+        clickup_list = "38260663"
         new_clickup_item = ClickupItem(
             name="test create item",
             description="Test create Description.",
@@ -65,7 +80,7 @@ class TestClickupRepository:
         )
 
         # WHEN
-        created_item = ClickupRepository.create_item(new_clickup_item, clickup_list)
+        created_item = clickup_instance.create_item(new_clickup_item, clickup_list)
 
         # THEN
         assert isinstance(created_item, ClickupItem)
@@ -88,11 +103,13 @@ class TestClickupRepository:
         assert result is True
 
     @pytest.mark.integration
-    def test_get_item(self, clickup_item: ClickupItem):
+    def test_get_item(
+        self, clickup_item: ClickupItem, clickup_instance: ClickupRepository
+    ):
         # GIVEN clickup_item
 
         # WHEN
-        retrieved_item = ClickupRepository.get_item_by_id(clickup_item.id)
+        retrieved_item = clickup_instance.get_item_by_id(clickup_item.id)
 
         # THEN
         assert isinstance(retrieved_item, ClickupItem)
@@ -104,26 +121,29 @@ class TestClickupRepository:
         assert retrieved_item.start_datetime == ClickupDatetime.from_datetime(
             datetime(2022, 12, 8, 9, 0, 0, 0, utc), True
         )
-        # FIXME will not be identical due to time. Need to removed time on creation?
         assert retrieved_item.end_datetime == ClickupDatetime.from_datetime(
             datetime(2022, 12, 10, 9, 0, 0, 0, utc), False
         )
 
     @pytest.mark.integration
-    def test_delete_item(self, clickup_item: ClickupItem):
+    def test_delete_item(
+        self, clickup_item: ClickupItem, clickup_instance: ClickupRepository
+    ):
         # GIVEN clickup_item
 
         # WHEN
-        result = ClickupRepository.delete_item_by_id(clickup_item.id)
+        result = clickup_instance.delete_item_by_id(clickup_item.id)
 
         # THEN
         assert result is True
 
-        deleted_item = ClickupRepository.get_item_by_id(clickup_item.id)
+        deleted_item = clickup_instance.get_item_by_id(clickup_item.id)
         print(repr(deleted_item))
 
     @pytest.mark.integration
-    def test_update_item(self, clickup_item: ClickupItem):
+    def test_update_item(
+        self, clickup_item: ClickupItem, clickup_instance: ClickupRepository
+    ):
         # GIVEN
         item_to_update = ClickupItem(
             id=clickup_item.id,
@@ -140,7 +160,7 @@ class TestClickupRepository:
         )
 
         # WHEN
-        updated_item = ClickupRepository.update_item(item_to_update)
+        updated_item = clickup_instance.update_item(item_to_update)
 
         # THEN
         assert isinstance(updated_item, ClickupItem)
