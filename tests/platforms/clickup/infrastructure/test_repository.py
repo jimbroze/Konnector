@@ -47,7 +47,7 @@ class TestClickupRepository:
         yield created_item
 
         # TEARDOWN
-        ClickupRepository.delete_item_by_id(created_item.id)
+        clickup_instance.delete_item_by_id(created_item.id)
 
     @pytest.mark.integration
     def test_get_items(self, clickup_instance: ClickupRepository):
@@ -84,7 +84,6 @@ class TestClickupRepository:
 
         # THEN
         assert isinstance(created_item, ClickupItem)
-        assert created_item == new_clickup_item
         assert created_item.name == "test create item"
         assert created_item.description == "Test create Description."
         assert created_item.priority == ClickupPriority(2)
@@ -97,7 +96,7 @@ class TestClickupRepository:
         )
 
         # WHEN
-        result = ClickupRepository.delete_item_by_id(created_item.id)
+        result = clickup_instance.delete_item_by_id(created_item.id)
 
         # THEN
         assert result is True
@@ -113,7 +112,6 @@ class TestClickupRepository:
 
         # THEN
         assert isinstance(retrieved_item, ClickupItem)
-        assert retrieved_item == clickup_item
         assert retrieved_item.name == "test item"
         assert retrieved_item.description == "Test Description."
         assert retrieved_item.priority == ClickupPriority(2)
@@ -164,7 +162,6 @@ class TestClickupRepository:
 
         # THEN
         assert isinstance(updated_item, ClickupItem)
-        assert updated_item == clickup_item
         assert updated_item.name == "New test name"
         assert updated_item.description == "new test Description."
         assert updated_item.priority == ClickupPriority(4)

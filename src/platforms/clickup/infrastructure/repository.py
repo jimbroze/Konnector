@@ -66,10 +66,10 @@ class ClickupRepository:
         except requests.exceptions.RequestException as e:
             logger.warning(e)
             raise
-        if "application/json" in response.headers.get("Content-Type"):
-            return response.json()
-        else:
+        if response.status_code == 204:
             return
+
+        return response.json()
 
     def get_items(self, list_id: str) -> list[ClickupItem]:
         """
@@ -179,7 +179,7 @@ class ClickupRepository:
         item_properties = ClickupItemMapper.from_entity(item)
 
         try:
-            updated_item = self._send_request(
+            update_item_properties = self._send_request(
                 f"/task/{item.id}", "PUT", {}, item_properties
             )
         except requests.exceptions.RequestException as err:
@@ -191,10 +191,12 @@ class ClickupRepository:
         logger.debug(f"Clickup item updated. Item: {item}")
 
         # Clickup requires custom field updates to use a different endpoint
-        changed_fields_item = item - updated_item
+        updated_item = ClickupItemMapper.to_entity(update_item_properties, self.localTz)
 
-        if changed_fields_item.custom_fields:
-            return self.update_custom_fields(changed_fields_item)
+        changed_custom_fields_item = item - updated_item
+
+        if changed_custom_fields_item.custom_fields:
+            return self.update_custom_fields(changed_custom_fields_item)
         else:
             return updated_item
 
@@ -212,7 +214,7 @@ class ClickupRepository:
         logger.debug(f"Trying to delete item from Clickup. Item_id: {item_id}")
 
         try:
-            self._send_request(f"/item/{item_id}", "DELETE", {})
+            self._send_request(f"/task/{item_id}", "DELETE", {})
         except requests.exceptions.HTTPError as err:
             if err.response.status_code == 404:
                 logger.warning(f"No Clickup item found with ID: {item_id}")
@@ -281,7 +283,7 @@ class ClickupRepository:
         for field_id, field_value in item.custom_fields.items():
             try:
                 self._send_request(
-                    f"/item/{item.id}/field/{field_id}",
+                    f"/task/{item.id}/field/{field_id}",
                     "POST",
                     {},
                     {"value": field_value},
@@ -294,7 +296,7 @@ class ClickupRepository:
 
         logger.debug(f"Updated custom fields on Clickup item. Item: {item}")
 
-        return self.get_item_by_id(item.id)
+        return ClickupItemMapper.to_entity(self.get_item_by_id(item.id), self.localTz)
 
 
 class ClickupItemMapper:

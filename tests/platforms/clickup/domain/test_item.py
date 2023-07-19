@@ -8,6 +8,16 @@ from platforms.clickup.domain.item import ClickupItem
 
 class TestClickupItem:
     @pytest.mark.unit
+    def test_item_requires_a_name(self):
+        # GIVEN
+        with pytest.raises(TypeError) as excinfo:
+            # WHEN
+            ClickupItem()
+
+        # THEN
+        assert "required positional argument" in str(excinfo.value)
+
+    @pytest.mark.unit
     def test_subtraction_with_same_params(self):
         # GIVEN
         tz = timezone("Europe/London")
@@ -112,3 +122,42 @@ class TestClickupItem:
         assert newItem.custom_fields == {
             "550a93a0-6978-4664-be6d-777cc0d7aff6": "5326456282"
         }
+
+    @pytest.mark.unit
+    def test_subtraction_with_missing_params(self):
+        # GIVEN
+        tz = timezone("Europe/London")
+
+        item_a = ClickupItem(
+            name="A item",
+            description="This is a item",
+            priority=ClickupPriority(3),
+            start_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
+            end_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
+            created_datetime=ClickupDatetime(1675209600000, True),
+            updated_datetime=ClickupDatetime(1675209600000, True),
+            status="next action",
+            custom_fields={
+                "550a93a0-6978-4664-be6d-777cc0d7aff6": "6410254717",
+                "f1e52dc5-0b71-4d4b-86f1-2d6c45d31b01": None,
+            },
+        )
+
+        item_b = ClickupItem(
+            name="An updated item",
+        )
+
+        # WHEN
+        newItem = item_b - item_a
+
+        # THEN
+        assert isinstance(newItem, ClickupItem)
+        assert newItem.name == "An updated item"
+        assert newItem.description is None
+        assert newItem.priority is None
+        assert newItem.start_datetime is None
+        assert newItem.end_datetime is None
+        assert newItem.created_datetime is None
+        assert newItem.updated_datetime is None
+        assert newItem.status is None
+        assert newItem.custom_fields == {}
