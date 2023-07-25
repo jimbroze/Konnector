@@ -1,6 +1,6 @@
 from __future__ import annotations
-from attrs import define, field
-from datetime import datetime, date, time
+from attrs import define
+from datetime import datetime, date
 from pytz import timezone, utc
 
 

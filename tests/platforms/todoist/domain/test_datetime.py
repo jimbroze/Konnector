@@ -1,6 +1,6 @@
 import pytest
 from datetime import date, datetime
-from pytz import utc, timezone
+from pytz import timezone
 
 from platforms.todoist.domain.datetime import TodoistDatetime
 
