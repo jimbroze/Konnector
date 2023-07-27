@@ -149,6 +149,9 @@ class TodoistRepository:
 
         logger.debug(f"Trying to create item in Todoist list: {list_id}. Item: {item}")
 
+        if item.content is None:
+            raise ValueError("Content is required to create a new Todoist item")
+
         item_properties = TodoistItemMapper.from_entity(item)
 
         try:
@@ -304,7 +307,7 @@ class TodoistItemMapper:
             todoist_dict["description"] = item.description
 
         if item.priority:
-            todoist_dict["priority"] = item.priority.to_int()
+            todoist_dict["priority"] = item.priority.priority
 
         if item.end_datetime is None:
             todoist_dict["due_string"] = "no date"

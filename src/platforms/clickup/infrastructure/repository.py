@@ -149,6 +149,9 @@ class ClickupRepository:
 
         logger.debug(f"Trying to create item in Clickup list: {list_id}. Item: {item}")
 
+        if item.name is None:
+            raise ValueError("Content is required to create a new Todoist item")
+
         item_properties = ClickupItemMapper.from_entity(item)
 
         try:
