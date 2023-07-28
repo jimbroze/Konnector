@@ -1,6 +1,6 @@
 import pytest
 from datetime import date, datetime
-from pytz import timezone
+from pytz import timezone, utc
 
 from platforms.todoist.domain.datetime import TodoistDatetime
 
@@ -10,8 +10,8 @@ class TestTodoistDateTime:
     def test_from_date_only_creates_date(self):
         todoist_datetime = TodoistDatetime.from_date(date(2023, 7, 10))
 
-        assert todoist_datetime.date_string == "2023-07-10"
-        assert todoist_datetime.datetime_string_utc is None
+        assert todoist_datetime.date_obj == date(2023, 7, 10)
+        assert todoist_datetime.datetime_utc is None
         assert todoist_datetime.timezone_string is None
 
     @pytest.mark.unit
@@ -20,8 +20,8 @@ class TestTodoistDateTime:
             datetime(2023, 7, 10, 8, 5, 2, 0)
         )
 
-        assert todoist_datetime.date_string == "2023-07-10"
-        assert todoist_datetime.datetime_string_utc == "2023-07-10T08:05:02.000000Z"
+        assert todoist_datetime.date_obj == date(2023, 7, 10)
+        assert todoist_datetime.datetime_utc == datetime(2023, 7, 10, 8, 5, 2, 0, utc)
         assert todoist_datetime.timezone_string == "UTC"
 
     @pytest.mark.unit
@@ -30,49 +30,51 @@ class TestTodoistDateTime:
             datetime(2023, 7, 10, 8, 5, 2, 0, timezone("Etc/GMT+1"))
         )
 
-        assert todoist_datetime.date_string == "2023-07-10"
-        assert todoist_datetime.datetime_string_utc == "2023-07-10T09:05:02.000000Z"
+        assert todoist_datetime.date_obj == date(2023, 7, 10)
+        assert todoist_datetime.datetime_utc == datetime(2023, 7, 10, 9, 5, 2, 0, utc)
         assert todoist_datetime.timezone_string == "Etc/GMT+1"
 
     @pytest.mark.unit
     def test_from_strings_with_time_and_location_timezone_produces_correct_datetime(
         self,
     ):
-        todoist_datetime = TodoistDatetime(
+        todoist_datetime = TodoistDatetime.from_strings(
             "2023-07-10", "2023-07-10T08:05:02.000000Z", "Europe/Moscow"
         )
 
-        assert todoist_datetime.date_string == "2023-07-10"
-        assert todoist_datetime.datetime_string_utc == "2023-07-10T08:05:02.000000Z"
+        assert todoist_datetime.date_obj == date(2023, 7, 10)
+        assert todoist_datetime.datetime_utc == datetime(2023, 7, 10, 8, 5, 2, 0, utc)
         assert todoist_datetime.timezone_string == "Europe/Moscow"
 
     @pytest.mark.unit
     def test_from_strings_with_time_and_offset_timezone_produces_correct_datetime(
         self,
     ):
-        todoist_datetime = TodoistDatetime(
+        todoist_datetime = TodoistDatetime.from_strings(
             "2023-07-10", "2023-07-10T08:05:02.000000Z", "UTC-01:00"
         )
 
-        assert todoist_datetime.date_string == "2023-07-10"
-        assert todoist_datetime.datetime_string_utc == "2023-07-10T08:05:02.000000Z"
+        assert todoist_datetime.date_obj == date(2023, 7, 10)
+        assert todoist_datetime.datetime_utc == "2023-07-10T08:05:02.000000Z"
         assert todoist_datetime.timezone_string == "UTC-01:00"
 
     @pytest.mark.unit
     def test_from_strings_with_no_time_produces_correct_date(self):
-        todoist_datetime = TodoistDatetime("2023-07-10")
+        todoist_datetime = TodoistDatetime.from_strings("2023-07-10")
 
-        assert todoist_datetime.date_string == "2023-07-10"
-        assert todoist_datetime.datetime_string_utc is None
+        assert todoist_datetime.date_obj == date(2023, 7, 10)
+        assert todoist_datetime.datetime_utc is None
         assert todoist_datetime.timezone_string is None
 
     @pytest.mark.unit
     def test_from_strings_with_time_and_no_timezone_assumes_UTC(self):
         # with pytest.raises(RuntimeError) as excinfo:
-        todoist_datetime = TodoistDatetime("2016-09-01", "2016-09-01T12:00:00.000000Z")
+        todoist_datetime = TodoistDatetime.from_strings(
+            "2016-09-01", "2016-09-01T12:00:00.000000Z"
+        )
 
-        assert todoist_datetime.date_string == "2016-09-01"
-        assert todoist_datetime.datetime_string_utc == "2016-09-01T12:00:00.000000Z"
+        assert todoist_datetime.date_obj == date(2016, 9, 1)
+        assert todoist_datetime.datetime_utc == "2016-09-01T12:00:00.000000Z"
         assert todoist_datetime.timezone_string == "UTC"
 
     # @pytest.mark.unit

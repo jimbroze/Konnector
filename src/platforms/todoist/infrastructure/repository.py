@@ -18,13 +18,12 @@ logger = logging.getLogger("gunicorn.error")
 
 class TodoistRepository:
     name = "todoist"
-    apiUrl = "https://api.todoist.com/api/v2"
+    apiUrl = "https://api.todoist.com/rest/v2"
 
-    def __init__(self, accessToken: str, localTz: timezone):
+    def __init__(self, accessToken: str):
         self.accessToken = accessToken
-        self.localTz = localTz
         self.headers = {
-            "Authorization": accessToken,
+            "Authorization": f"Bearer {accessToken}",
             "Content-Type": "application/json",
         }
 
@@ -71,29 +70,27 @@ class TodoistRepository:
 
         return response.json()
 
-    def get_items(self, list_id: str) -> list[TodoistItem]:
+    def get_items(self, project_id: str = None) -> list[TodoistItem]:
         """
         Retrieve a list of items from the platform's API.
 
         Arguments:
-            list_id: The ID of a list that items should be taken from
+            project_id: The optional ID of a list that items should be taken from
 
         Returns:
             A list of (Item) objects
         """
 
-        # TODO Test if required
-        # # Listname required for todoist
-        # if list_name is None:
-        #     raise Exception("A list name is required to get items from Todoist")
+        request_params = {project_id: project_id} if project_id else {}
 
         try:
-            retrieved_items = self._send_request(f"/list/{list_id}/task", "GET", {})[
-                "tasks"
-            ]
+            retrieved_items = self._send_request("/tasks", "GET", request_params)
         except requests.exceptions.HTTPError as err:
             if err.response.status_code == 404:
-                logger.warning(f"No Todoist items found in list: {list_id}")
+                logger.warning(
+                    "No Todoist items found"
+                    + (f" in project with ID {project_id}" if project_id else "")
+                )
                 return []
             raise
         except requests.exceptions.RequestException:
@@ -101,7 +98,7 @@ class TodoistRepository:
 
         logger.debug(f"{len(retrieved_items)} Todoist tasks retrieved.")
         return [
-            TodoistItemMapper.to_entity(retrieved_item, self.localTz)
+            TodoistItemMapper.to_entity(retrieved_item)
             for retrieved_item in retrieved_items
         ]
 
@@ -121,7 +118,7 @@ class TodoistRepository:
         logger.debug(f"Trying to get an item from Todoist. Item ID: {item_id}")
 
         try:
-            retrieved_item = self._send_request(f"/task/{item_id}", "GET", {})
+            retrieved_item = self._send_request(f"/tasks/{item_id}", "GET", {})
         except requests.exceptions.HTTPError as err:
             if err.response.status_code == 404:
                 logger.warning(f"No Todoist item found with ID: {item_id}")
@@ -130,45 +127,49 @@ class TodoistRepository:
         except requests.exceptions.RequestException:
             raise
 
-        todoist_item = TodoistItemMapper.to_entity(retrieved_item, self.localTz)
+        todoist_item = TodoistItemMapper.to_entity(retrieved_item)
 
         logger.debug(f"Todoist item retrieved. Item: ${todoist_item}")
         return todoist_item
 
-    def create_item(self, item: TodoistItem, list_id: str) -> TodoistItem:
+    def create_item(self, item: TodoistItem, project_id: str = None) -> TodoistItem:
         """
         Create a new item on Todoist's API from a item object.
 
         Arguments:
             item: The item object to be sent to the API
-            list_id: The ID of a list that the item should be added to
+            project_id: The ID of a list that the item should be added to
 
         Returns:
             The created item
         """
 
-        logger.debug(f"Trying to create item in Todoist list: {list_id}. Item: {item}")
+        logger.debug(
+            "Trying to create item in Todoist"
+            + (f" project with ID: {project_id}" if project_id else "")
+            + f". Item: {item}"
+        )
 
         if item.content is None:
             raise ValueError("Content is required to create a new Todoist item")
 
         item_properties = TodoistItemMapper.from_entity(item)
+        if project_id:
+            item_properties["project_id"] = project_id
 
         try:
-            created_item = self._send_request(
-                f"/list/{list_id}/task", "POST", {}, item_properties
-            )
+            created_item = self._send_request("/tasks", "POST", {}, item_properties)
         except requests.exceptions.RequestException:
             raise
 
-        todoist_item = TodoistItemMapper.to_entity(created_item, self.localTz)
+        todoist_item = TodoistItemMapper.to_entity(created_item)
 
         logger.debug(f"Todoist item created. Item: {todoist_item}")
         return todoist_item
 
     def update_item(self, item: TodoistItem) -> TodoistItem:
         """
-        Update the properties of an existing item on the platform's API.
+        Update the properties of an existing item in Todoist.
 
         Arguments:
             item: An item containing the updated properties
@@ -182,8 +183,8 @@ class TodoistRepository:
         item_properties = TodoistItemMapper.from_entity(item)
 
         try:
-            update_item_properties = self._send_request(
-                f"/task/{item.id}", "PUT", {}, item_properties
+            updated_item_properties = self._send_request(
+                f"/tasks/{item.id}", "POST", {}, item_properties
             )
         except requests.exceptions.RequestException as err:
             raise Exception(
@@ -193,15 +194,7 @@ class TodoistRepository:
 
         logger.debug(f"Todoist item updated. Item: {item}")
 
-        # Todoist requires custom field updates to use a different endpoint
-        updated_item = TodoistItemMapper.to_entity(update_item_properties, self.localTz)
-
-        changed_custom_fields_item = item - updated_item
-
-        if changed_custom_fields_item.custom_fields:
-            return self.update_custom_fields(changed_custom_fields_item)
-        else:
-            return updated_item
+        return TodoistItemMapper.to_entity(updated_item_properties)
 
     def delete_item_by_id(self, item_id: TodoistItem) -> bool:
         """
@@ -217,7 +210,7 @@ class TodoistRepository:
         logger.debug(f"Trying to delete item from Todoist. Item_id: {item_id}")
 
         try:
-            self._send_request(f"/task/{item_id}", "DELETE", {})
+            self._send_request(f"/tasks/{item_id}", "DELETE", {})
         except requests.exceptions.HTTPError as err:
             if err.response.status_code == 404:
                 logger.warning(f"No Todoist item found with ID: {item_id}")
@@ -230,7 +223,7 @@ class TodoistRepository:
 
         return True
 
-    def set_item_complete(self, item: TodoistItem) -> TodoistItem:
+    def set_item_complete(self, item_id: str) -> TodoistItem:
         """
         Mark an existing item as complete on the Todoist's API.
 
@@ -241,40 +234,33 @@ class TodoistRepository:
             The completed item
         """
 
-        logger.info(f"Trying to mark Todoist item as complete. Item: {item}")
+        logger.info(f"Trying to mark Todoist item as complete. ID: {item_id}")
 
-        retrievedItem = self.get_item_by_id(item.id)
+        retrievedItem = self.get_item_by_id(item_id)
         if retrievedItem is None:
             # TODO create a GetItemException or NotFoundException?
-            raise Exception(f"Error getting item from Todoist. Item: {item}")
+            raise Exception(f"Error getting item from Todoist. ID: {item_id}")
         if retrievedItem.is_completed:
             raise Exception("Todoist item already complete")
 
-        item_to_update = TodoistItem(id=item.id)
-        item_to_update.is_completed = True
-
-        item_properties = TodoistItemMapper.from_entity(item_to_update)
-
         try:
-            updated_item = self._send_request(
-                f"/task/{item.id}", "PUT", {}, item_properties
-            )
+            self._send_request(f"/tasks/{item_id}/close", "POST", {})
         except requests.exceptions.RequestException:
             raise
 
-        todoist_item = TodoistItemMapper.to_entity(updated_item, self.localTz)
+        todoist_item = self.get_item_by_id(item_id)
         logger.debug(f"Todoist item completed. Item: {todoist_item}")
 
         return todoist_item
 
 
 class TodoistItemMapper:
-    """A date transfer object that maps Todoist Items from Todoist API data"""
+    """A class that maps Todoist Items from Todoist API data"""
 
     @staticmethod
     def to_entity(todoist_response: dict) -> TodoistItem:
         end_datetime = (
-            TodoistDatetime(
+            TodoistDatetime.from_strings(
                 todoist_response["due"].get("date", None),
                 todoist_response["due"].get("datetime", None),
                 todoist_response["due"].get("timezone", None),
@@ -312,8 +298,8 @@ class TodoistItemMapper:
         if item.end_datetime is None:
             todoist_dict["due_string"] = "no date"
         elif item.end_datetime.contains_time():
-            todoist_dict["due_datetime"] = item.end_datetime.datetime_string_utc
+            todoist_dict["due_datetime"] = item.end_datetime.to_datetime_string_utc()
         else:
-            todoist_dict["due_date"] = item.end_datetime.date_string
+            todoist_dict["due_date"] = item.end_datetime.to_date_string()
 
         return todoist_dict
