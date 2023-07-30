@@ -1,5 +1,5 @@
 from __future__ import annotations
-from attrs import define, field
+from attrs import define, field, validators
 from datetime import datetime, date
 from pytz import timezone, utc
 
@@ -7,10 +7,14 @@ from pytz import timezone, utc
 @define
 class TodoistDatetime:
     # TODO add validation and tests
-    date_obj: date
-    datetime_utc: datetime = None
+    date_obj: date = field(validator=validators.optional(validators.instance_of(date)))
+    datetime_utc: datetime = field(
+        default=None, validator=validators.optional(validators.instance_of(datetime))
+    )
     timezone_string: str = field(
-        default="UTC", eq=False
+        default="UTC",
+        eq=False,
+        validator=validators.optional(validators.instance_of(str)),
     )  # TODO is this what we want? Need to add test
 
     @classmethod
@@ -33,7 +37,10 @@ class TodoistDatetime:
 
     @classmethod
     def from_strings(
-        cls, date_string: str, datetime_string_utc: str, timezone_string: str
+        cls,
+        date_string: str,
+        datetime_string_utc: str = None,
+        timezone_string: str = "UTC",
     ) -> TodoistDatetime:
         date_obj = date.fromisoformat(date_string) if date_string else None
 
@@ -61,7 +68,7 @@ class TodoistDatetime:
         return self.date_obj.isoformat()
 
     def to_datetime_string_utc(self) -> bool:
-        return self.datetime_utc.isoformat()
+        return self.datetime_utc.isoformat("T", "microseconds")
 
     def to_datetime_string_local(self) -> bool:
         return (

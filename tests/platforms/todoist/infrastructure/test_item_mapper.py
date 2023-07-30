@@ -92,7 +92,7 @@ class TestTodoistItemMapper:
 
         # THEN
         assert "due_date" not in todoist_dict
-        assert todoist_dict["due_datetime"] == "2022-12-08T12:00:00.000000Z"
+        assert todoist_dict["due_datetime"] == "2022-12-08T12:00:00.000000+00:00"
 
     @pytest.mark.unit
     def test_from_entity_handles_null_values(self):

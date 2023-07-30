@@ -279,7 +279,9 @@ class TodoistItemMapper:
                 else None
             ),
             end_datetime=end_datetime,
-            created_datetime=TodoistDatetime(None, todoist_response["created_at"]),
+            created_datetime=TodoistDatetime.from_strings(
+                None, todoist_response["created_at"]
+            ),
             is_completed=todoist_response["is_completed"],
         )
 
