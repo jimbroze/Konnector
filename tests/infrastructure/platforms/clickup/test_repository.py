@@ -4,10 +4,10 @@ import pytest
 import os
 from dotenv import load_dotenv
 
-from platforms.clickup.domain.datetime import ClickupDatetime
-from platforms.clickup.domain.priority import ClickupPriority
-from platforms.clickup.domain.item import ClickupItem
-from platforms.clickup.infrastructure.repository import ClickupRepository
+from domain.platforms.clickup.datetime import ClickupDatetime
+from domain.platforms.clickup.priority import ClickupPriority
+from domain.platforms.clickup.item import ClickupItem
+from infrastructure.platforms.clickup.repository import ClickupRepository
 
 
 load_dotenv()

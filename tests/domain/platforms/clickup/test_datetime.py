@@ -2,7 +2,7 @@ import pytest
 from datetime import date, datetime
 from pytz import utc
 
-from platforms.clickup.domain.datetime import ClickupDatetime
+from domain.platforms.clickup.datetime import ClickupDatetime
 
 
 class TestClickupDateTime:

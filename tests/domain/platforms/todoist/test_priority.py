@@ -1,6 +1,6 @@
 import pytest
 
-from platforms.todoist.domain.priority import TodoistPriority
+from domain.platforms.todoist.priority import TodoistPriority
 
 
 class TestTodoistPriority:

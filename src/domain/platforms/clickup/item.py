@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from platforms.clickup.domain.datetime import ClickupDatetime
-from platforms.clickup.domain.priority import ClickupPriority
+from domain.platforms.clickup.datetime import ClickupDatetime
+from domain.platforms.clickup.priority import ClickupPriority
 
 
 class ClickupItem:

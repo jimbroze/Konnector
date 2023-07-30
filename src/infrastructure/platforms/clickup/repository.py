@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 import requests
 
 # from konnector.domain.item.repositories import ItemRepository
-from platforms.clickup.domain.datetime import ClickupDatetime
-from platforms.clickup.domain.priority import ClickupPriority
-from platforms.clickup.domain.item import ClickupItem
+from domain.platforms.clickup.datetime import ClickupDatetime
+from domain.platforms.clickup.priority import ClickupPriority
+from domain.platforms.clickup.item import ClickupItem
 
 
 load_dotenv()

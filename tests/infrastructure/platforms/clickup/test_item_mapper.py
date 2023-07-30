@@ -2,10 +2,10 @@ from datetime import datetime, date
 from pytz import timezone
 import pytest
 
-from platforms.clickup.domain.datetime import ClickupDatetime
-from platforms.clickup.domain.priority import ClickupPriority
-from platforms.clickup.domain.item import ClickupItem
-from platforms.clickup.infrastructure.repository import ClickupItemMapper
+from domain.platforms.clickup.datetime import ClickupDatetime
+from domain.platforms.clickup.priority import ClickupPriority
+from domain.platforms.clickup.item import ClickupItem
+from infrastructure.platforms.clickup.repository import ClickupItemMapper
 
 
 class TestClickupItemMapper:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from platforms.todoist.domain.datetime import TodoistDatetime
-from platforms.todoist.domain.priority import TodoistPriority
+from domain.platforms.todoist.datetime import TodoistDatetime
+from domain.platforms.todoist.priority import TodoistPriority
 
 
 class TodoistItem:

@@ -5,9 +5,9 @@ from dotenv import load_dotenv
 import requests
 
 # from konnector.domain.item.repositories import ItemRepository
-from platforms.todoist.domain.datetime import TodoistDatetime
-from platforms.todoist.domain.priority import TodoistPriority
-from platforms.todoist.domain.item import TodoistItem
+from domain.platforms.todoist.datetime import TodoistDatetime
+from domain.platforms.todoist.priority import TodoistPriority
+from domain.platforms.todoist.item import TodoistItem
 
 
 load_dotenv()
