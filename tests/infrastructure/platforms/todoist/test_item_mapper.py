@@ -26,6 +26,7 @@ class TestTodoistItemMapper:
             datetime(2016, 9, 1, 12, 0, 0, 0)
         )
         assert todoist_item.is_completed is False
+        assert todoist_item.project_id == "2203306141"
 
     @pytest.mark.unit
     def test_to_entity_handles_null_values(self):
@@ -50,6 +51,7 @@ class TestTodoistItemMapper:
             priority=TodoistPriority(2),
             end_datetime=TodoistDatetime.from_date(date(2022, 12, 8)),
             is_completed=False,
+            project_id="2203306141",
         )
 
         # WHEN
@@ -62,6 +64,7 @@ class TestTodoistItemMapper:
         assert todoist_dict["priority"] == int(2)
         assert todoist_dict["due_date"] == "2022-12-08"
         assert "is_completed" not in todoist_dict
+        assert todoist_dict["project_id"] == "2203306141"
 
     @pytest.mark.unit
     def test_from_entity_with_date_has_no_datetime(self):
@@ -109,6 +112,7 @@ class TestTodoistItemMapper:
         assert "due_date" not in todoist_dict
         assert "due_datetime" not in todoist_dict
         assert "is_completed" not in todoist_dict
+        assert "project_id" not in todoist_dict
 
 
 # Taken from Actual API response

@@ -6,7 +6,7 @@ from domain.platforms.todoist.priority import TodoistPriority
 
 class TodoistItem:
     """
-    An item in a todoist list.
+    An item in a todoist project list.
 
     ...
 
@@ -26,6 +26,8 @@ class TodoistItem:
         When the item was created
     is_completed : bool
         Whether the item is completed
+    project_id : str
+        A unique identifier for the project list containing this item
     """
 
     def __init__(
@@ -38,6 +40,7 @@ class TodoistItem:
         created_datetime: TodoistDatetime = None,
         updated_datetime: TodoistDatetime = None,
         is_completed: bool = None,
+        project_id: str = None,
     ):
         self.content = content
         self.id = id
@@ -47,6 +50,7 @@ class TodoistItem:
         self.created_datetime = created_datetime
         self.updated_datetime = updated_datetime
         self.is_completed = is_completed
+        self.project_id = project_id
 
     def __str__(self):
         return f"{self.content}"
@@ -55,10 +59,11 @@ class TodoistItem:
         return (
             f"TodoistItem(id={self.id}, content={self.content},"
             f" description={self.description}, priority={self.priority},"
-            f" end_datetime={self.end_datetime})"
+            f" end_datetime={self.end_datetime},"
             f" created_datetime={self.created_datetime},"
-            f" updated_datetime={self.updated_datetime}"
-            f" is_completed={self.is_completed})"
+            f" updated_datetime={self.updated_datetime},"
+            f" is_completed={self.is_completed},"
+            f" project_id={self.project_id})"
         )
 
     def __sub__(self, other: TodoistItem) -> TodoistItem:
@@ -84,4 +89,5 @@ class TodoistItem:
             is_completed=self.is_completed
             if self.is_completed != other.is_completed
             else None,
+            project_id=self.project_id if self.project_id != other.project_id else None,
         )

@@ -180,6 +180,8 @@ class TodoistRepository:
 
         logger.debug(f"Trying to update item on Todoist. Item: {item}")
 
+        item.project_id = None
+
         item_properties = TodoistItemMapper.from_entity(item)
 
         try:
@@ -283,6 +285,7 @@ class TodoistItemMapper:
                 None, todoist_response["created_at"]
             ),
             is_completed=todoist_response["is_completed"],
+            project_id=todoist_response["project_id"],
         )
 
     @staticmethod
@@ -303,5 +306,8 @@ class TodoistItemMapper:
             todoist_dict["due_datetime"] = item.end_datetime.to_datetime_string_utc()
         else:
             todoist_dict["due_date"] = item.end_datetime.to_date_string()
+
+        if item.project_id:
+            todoist_dict["project_id"] = item.project_id
 
         return todoist_dict
