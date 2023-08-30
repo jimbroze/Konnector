@@ -9,9 +9,9 @@ class TestEvent(Event):
     pass
 
 
+# TODO convert from static
 class TestEventHandler(EventHandler):
-    @staticmethod
-    def handle(event: Event):
+    def handle(self, event: Event):
         pass
 
 
@@ -23,7 +23,6 @@ class TestMessageBus:
     test_event = None
     event_mappings = {}
 
-    @pytest.fixture()
     def setup_method(self):
         self.testEvent = TestEvent()
 

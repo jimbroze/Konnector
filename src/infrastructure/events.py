@@ -6,6 +6,5 @@ class Event(ABC):
 
 
 class EventHandler(ABC):
-    @staticmethod
-    def handle(event: Event):
+    def handle(self, event: Event):
         raise NotImplementedError

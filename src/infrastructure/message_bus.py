@@ -1,4 +1,3 @@
-from application.events import EVENT_MAPPINGS
 from infrastructure.events import Event
 
 
