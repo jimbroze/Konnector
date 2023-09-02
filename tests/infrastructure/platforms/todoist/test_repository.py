@@ -20,7 +20,7 @@ class TestTodoistRepository:
     @pytest.fixture
     def todoist_instance(self):
         # SETUP
-        todoist_repo = TodoistRepository(TODOIST_TOKEN)
+        todoist_repo = TodoistRepository(TODOIST_TOKEN, TIMEZONE)
 
         # YIELD
         yield todoist_repo

@@ -57,11 +57,15 @@ class TodoistDatetime:
     @classmethod
     def from_strings(
         cls,
-        date_string: str,
-        timezone_string: str,
+        date_string: str = None,
+        timezone_string: str = "UTC",
         datetime_string_utc: str = None,
     ) -> TodoistDatetime:
-        date_obj = date.fromisoformat(date_string) if date_string else None
+        """
+        Either a date string or datetime string must be provided.
+
+        Timezone defaults to UTC.
+        """
 
         if datetime_string_utc is None:
             datetime_obj = None
@@ -76,6 +80,10 @@ class TodoistDatetime:
             )
 
             datetime_obj = utc.localize(datetime.strptime(datetime_string_utc, format))
+
+        date_obj = (
+            date.fromisoformat(date_string) if date_string else datetime_obj.date()
+        )
 
         try:
             tz = timezone(timezone_string)

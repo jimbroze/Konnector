@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from pytz import utc
 import pytest
 
 from domain.platforms.todoist.datetime import TodoistDatetime
@@ -12,9 +13,10 @@ class TestTodoistItemMapper:
     def test_to_entity_converts_API_data_to_entity(self):
         # GIVEN
         api_response = todoist_item_response
+        tz = utc
 
         # WHEN
-        todoist_item = TodoistItemMapper.to_entity(api_response)
+        todoist_item = TodoistItemMapper.to_entity(api_response, tz)
 
         # THEN
         assert isinstance(todoist_item, TodoistItem)
@@ -32,9 +34,10 @@ class TestTodoistItemMapper:
     def test_to_entity_handles_null_values(self):
         # GIVEN
         api_response = todoist_empty_response
+        tz = utc
 
         # WHEN
-        todoist_item = TodoistItemMapper.to_entity(api_response)
+        todoist_item = TodoistItemMapper.to_entity(api_response, tz)
 
         # THEN
         assert isinstance(todoist_item, TodoistItem)

@@ -26,8 +26,8 @@ class TestClickupItem:
             name="A item",
             description="This is a item",
             priority=ClickupPriority(3),
-            start_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
-            end_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
+            start_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
+            end_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
             created_datetime=ClickupDatetime(1675209600000, True),
             updated_datetime=ClickupDatetime(1675209600000, True),
             status="next action",
@@ -41,8 +41,8 @@ class TestClickupItem:
             name="A item",
             description="This is a item",
             priority=ClickupPriority(3),
-            start_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
-            end_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
+            start_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
+            end_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
             created_datetime=ClickupDatetime(1675209600000, True),
             updated_datetime=ClickupDatetime(1675209600000, True),
             status="next action",
@@ -76,8 +76,8 @@ class TestClickupItem:
             name="A item",
             description="This is a item",
             priority=ClickupPriority(3),
-            start_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
-            end_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
+            start_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
+            end_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
             created_datetime=ClickupDatetime(1675209600000, True),
             updated_datetime=ClickupDatetime(1675209600000, True),
             status="next action",
@@ -91,8 +91,8 @@ class TestClickupItem:
             name="An updated item",
             description="This is an updated item",
             priority=ClickupPriority(1),
-            start_datetime=ClickupDatetime.from_time_unknown(1672621323000, tz),
-            end_datetime=ClickupDatetime.from_time_unknown(1675209600001, tz),
+            start_datetime=ClickupDatetime.from_timestamp(1672621323000, tz),
+            end_datetime=ClickupDatetime.from_timestamp(1675209600001, tz),
             created_datetime=ClickupDatetime(1675209605000, True),
             updated_datetime=ClickupDatetime(1675209607000, True),
             status="complete",
@@ -110,12 +110,10 @@ class TestClickupItem:
         assert newItem.name == "An updated item"
         assert newItem.description == "This is an updated item"
         assert newItem.priority == ClickupPriority(1)
-        assert newItem.start_datetime == ClickupDatetime.from_time_unknown(
+        assert newItem.start_datetime == ClickupDatetime.from_timestamp(
             1672621323000, tz
         )
-        assert newItem.end_datetime == ClickupDatetime.from_time_unknown(
-            1675209600001, tz
-        )
+        assert newItem.end_datetime == ClickupDatetime.from_timestamp(1675209600001, tz)
         assert newItem.created_datetime == ClickupDatetime(1675209605000, True)
         assert newItem.updated_datetime == ClickupDatetime(1675209607000, True)
         assert newItem.status == "complete"
@@ -132,8 +130,8 @@ class TestClickupItem:
             name="A item",
             description="This is a item",
             priority=ClickupPriority(3),
-            start_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
-            end_datetime=ClickupDatetime.from_time_unknown(1675209600000, tz),
+            start_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
+            end_datetime=ClickupDatetime.from_timestamp(1675209600000, tz),
             created_datetime=ClickupDatetime(1675209600000, True),
             updated_datetime=ClickupDatetime(1675209600000, True),
             status="next action",

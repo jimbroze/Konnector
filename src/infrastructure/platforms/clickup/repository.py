@@ -20,9 +20,9 @@ class ClickupRepository:
     name = "clickup"
     apiUrl = "https://api.clickup.com/api/v2"
 
-    def __init__(self, accessToken: str, localTz: timezone):
+    def __init__(self, accessToken: str, local_tz: timezone):
         self.accessToken = accessToken
-        self.localTz = localTz
+        self.local_tz = local_tz
         self.headers = {
             "Authorization": accessToken,
             "Content-Type": "application/json",
@@ -101,7 +101,7 @@ class ClickupRepository:
 
         logger.debug(f"{len(retrieved_items)} Clickup tasks retrieved.")
         return [
-            ClickupItemMapper.to_entity(retrieved_item, self.localTz)
+            ClickupItemMapper.to_entity(retrieved_item, self.local_tz)
             for retrieved_item in retrieved_items
         ]
 
@@ -130,7 +130,7 @@ class ClickupRepository:
         except requests.exceptions.RequestException:
             raise
 
-        clickup_item = ClickupItemMapper.to_entity(retrieved_item, self.localTz)
+        clickup_item = ClickupItemMapper.to_entity(retrieved_item, self.local_tz)
 
         logger.debug(f"Clickup item retrieved. Item: ${clickup_item}")
         return clickup_item
@@ -161,7 +161,7 @@ class ClickupRepository:
         except requests.exceptions.RequestException:
             raise
 
-        clickup_item = ClickupItemMapper.to_entity(created_item, self.localTz)
+        clickup_item = ClickupItemMapper.to_entity(created_item, self.local_tz)
 
         logger.debug(f"Clickup item created. Item: {clickup_item}")
         return clickup_item
@@ -194,7 +194,9 @@ class ClickupRepository:
         logger.debug(f"Clickup item updated. Item: {item}")
 
         # Clickup requires custom field updates to use a different endpoint
-        updated_item = ClickupItemMapper.to_entity(update_item_properties, self.localTz)
+        updated_item = ClickupItemMapper.to_entity(
+            update_item_properties, self.local_tz
+        )
 
         changed_custom_fields_item = item - updated_item
 
@@ -262,7 +264,7 @@ class ClickupRepository:
         except requests.exceptions.RequestException:
             raise
 
-        clickup_item = ClickupItemMapper.to_entity(updated_item, self.localTz)
+        clickup_item = ClickupItemMapper.to_entity(updated_item, self.local_tz)
         logger.debug(f"Clickup item completed. Item: {clickup_item}")
 
         return clickup_item
@@ -299,14 +301,14 @@ class ClickupRepository:
 
         logger.debug(f"Updated custom fields on Clickup item. Item: {item}")
 
-        return ClickupItemMapper.to_entity(self.get_item_by_id(item.id), self.localTz)
+        return ClickupItemMapper.to_entity(self.get_item_by_id(item.id), self.local_tz)
 
 
 class ClickupItemMapper:
     """A date transfer object that maps Clickup Items from Clickup API data"""
 
     @staticmethod
-    def to_entity(clickup_response: dict, localTz: timezone) -> ClickupItem:
+    def to_entity(clickup_response: dict, local_tz: timezone) -> ClickupItem:
         return ClickupItem(
             id=clickup_response["id"],
             name=clickup_response["name"],
@@ -314,13 +316,13 @@ class ClickupItemMapper:
             priority=ClickupPriority(clickup_response["priority"]["id"])
             if clickup_response["priority"] is not None
             else None,
-            start_datetime=ClickupDatetime.from_time_unknown(
-                clickup_response["start_date"], localTz
+            start_datetime=ClickupDatetime.from_timestamp(
+                clickup_response["start_date"], local_tz
             )
             if clickup_response["start_date"] is not None
             else None,
-            end_datetime=ClickupDatetime.from_time_unknown(
-                clickup_response["due_date"], localTz
+            end_datetime=ClickupDatetime.from_timestamp(
+                clickup_response["due_date"], local_tz
             )
             if clickup_response["due_date"] is not None
             else None,
@@ -343,11 +345,11 @@ class ClickupItemMapper:
         if item.priority:
             clickup_dict["priority"] = item.priority.to_int()
         if item.start_datetime:
-            clickup_dict["start_date"] = item.start_datetime.to_int()
-            clickup_dict["start_date_time"] = item.start_datetime.time_included
+            clickup_dict["start_date"] = item.start_datetime.to_timestamp_milli()
+            clickup_dict["start_date_time"] = item.start_datetime.contains_time()
         if item.end_datetime:
-            clickup_dict["due_date"] = item.end_datetime.to_int()
-            clickup_dict["due_date_time"] = item.end_datetime.time_included
+            clickup_dict["due_date"] = item.end_datetime.to_timestamp_milli()
+            clickup_dict["due_date_time"] = item.end_datetime.contains_time()
         if item.status:
             clickup_dict["status"] = item.status
         if item.custom_fields:

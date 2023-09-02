@@ -9,7 +9,6 @@ class TestEvent(Event):
     pass
 
 
-# TODO convert from static
 class TestEventHandler(EventHandler):
     def handle(self, event: Event):
         pass

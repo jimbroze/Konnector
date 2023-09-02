@@ -20,8 +20,9 @@ class TodoistRepository:
     name = "todoist"
     apiUrl = "https://api.todoist.com/rest/v2"
 
-    def __init__(self, accessToken: str):
+    def __init__(self, accessToken: str, local_tz: timezone):
         self.accessToken = accessToken
+        self.local_tz = local_tz
         self.headers = {
             "Authorization": f"Bearer {accessToken}",
             "Content-Type": "application/json",
@@ -98,7 +99,7 @@ class TodoistRepository:
 
         logger.debug(f"{len(retrieved_items)} Todoist tasks retrieved.")
         return [
-            TodoistItemMapper.to_entity(retrieved_item)
+            TodoistItemMapper.to_entity(retrieved_item, self.local_tz)
             for retrieved_item in retrieved_items
         ]
 
@@ -127,7 +128,7 @@ class TodoistRepository:
         except requests.exceptions.RequestException:
             raise
 
-        todoist_item = TodoistItemMapper.to_entity(retrieved_item)
+        todoist_item = TodoistItemMapper.to_entity(retrieved_item, self.local_tz)
 
         logger.debug(f"Todoist item retrieved. Item: ${todoist_item}")
         return todoist_item
@@ -162,7 +163,7 @@ class TodoistRepository:
         except requests.exceptions.RequestException:
             raise
 
-        todoist_item = TodoistItemMapper.to_entity(created_item)
+        todoist_item = TodoistItemMapper.to_entity(created_item, self.local_tz)
 
         logger.debug(f"Todoist item created. Item: {todoist_item}")
         return todoist_item
@@ -196,7 +197,7 @@ class TodoistRepository:
 
         logger.debug(f"Todoist item updated. Item: {item}")
 
-        return TodoistItemMapper.to_entity(updated_item_properties)
+        return TodoistItemMapper.to_entity(updated_item_properties, self.local_tz)
 
     def delete_item_by_id(self, item_id: TodoistItem) -> bool:
         """
@@ -259,17 +260,20 @@ class TodoistRepository:
 class TodoistItemMapper:
     """A class that maps Todoist Items from Todoist API data"""
 
+    # TODO change names to match Todoist. Task, due etc.
     @staticmethod
-    def to_entity(todoist_response: dict) -> TodoistItem:
+    def to_entity(todoist_response: dict, tz: timezone) -> TodoistItem:
         end_datetime = (
             TodoistDatetime.from_strings(
-                todoist_response["due"].get("date", None),
+                todoist_response["due"].get("date"),
+                todoist_response["due"].get("timezone", None) or str(tz),
                 todoist_response["due"].get("datetime", None),
-                todoist_response["due"].get("timezone", None),
             )
             if todoist_response["due"] is not None
             else None
         )
+
+        print(end_datetime)
 
         return TodoistItem(
             id=todoist_response["id"],
@@ -282,7 +286,7 @@ class TodoistItemMapper:
             ),
             end_datetime=end_datetime,
             created_datetime=TodoistDatetime.from_strings(
-                None, todoist_response["created_at"]
+                datetime_string_utc=todoist_response["created_at"]
             ),
             is_completed=todoist_response["is_completed"],
             project_id=todoist_response["project_id"],

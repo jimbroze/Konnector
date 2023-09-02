@@ -30,10 +30,10 @@ class TestTodoistItem:
             description="This is a item",
             priority=TodoistPriority(3),
             end_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T13:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T13:00:00.000000Z"
             ),
             created_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T14:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T14:00:00.000000Z"
             ),
             is_completed=False,
         )
@@ -43,10 +43,10 @@ class TestTodoistItem:
             description="This is a item",
             priority=TodoistPriority(3),
             end_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T13:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T13:00:00.000000Z"
             ),
             created_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T14:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T14:00:00.000000Z"
             ),
             is_completed=False,
         )
@@ -72,10 +72,10 @@ class TestTodoistItem:
             description="This is a item",
             priority=TodoistPriority(3),
             end_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T13:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T13:00:00.000000Z"
             ),
             created_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T14:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T14:00:00.000000Z"
             ),
             is_completed=False,
         )
@@ -85,10 +85,10 @@ class TestTodoistItem:
             description="This is an updated item",
             priority=TodoistPriority(1),
             end_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T12:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T12:00:00.000000Z"
             ),
             created_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T12:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T12:00:00.000000Z"
             ),
             is_completed=True,
         )
@@ -102,10 +102,10 @@ class TestTodoistItem:
         assert newItem.description == "This is an updated item"
         assert newItem.priority == TodoistPriority(1)
         assert newItem.end_datetime == TodoistDatetime.from_strings(
-            "2016-09-01", "2016-09-01T12:00:00.000000Z"
+            "2016-09-01", "UTC", "2016-09-01T12:00:00.000000Z"
         )
         assert newItem.created_datetime == TodoistDatetime.from_strings(
-            "2016-09-01", "2016-09-01T12:00:00.000000Z"
+            "2016-09-01", "UTC", "2016-09-01T12:00:00.000000Z"
         )
         assert newItem.is_completed is True
 
@@ -117,10 +117,10 @@ class TestTodoistItem:
             description="This is a item",
             priority=TodoistPriority(3),
             end_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T12:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T12:00:00.000000Z"
             ),
             created_datetime=TodoistDatetime.from_strings(
-                "2016-09-01", "2016-09-01T12:00:00.000000Z"
+                "2016-09-01", "UTC", "2016-09-01T12:00:00.000000Z"
             ),
             is_completed=False,
         )
