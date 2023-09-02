@@ -1,46 +1,65 @@
 from __future__ import annotations
 from attrs import define, field, validators
-from datetime import datetime, date
-from pytz import timezone, utc
+from datetime import datetime, date, tzinfo, timedelta, timezone as offset_timezone
+from pytz import timezone, utc, UnknownTimeZoneError
+from re import match
+
+
+def get_timezone_from_offset(offset: str) -> tzinfo:
+    sign, hours, minutes = match(r"UTC([+\-])(\d{2}):(\d{2})", offset).groups()
+    sign = -1 if sign == "-" else 1
+    hours, minutes = int(hours), int(minutes)
+
+    return offset_timezone(sign * timedelta(hours=hours, minutes=minutes))
 
 
 @define
 class TodoistDatetime:
-    # TODO add validation and tests
-    date_obj: date = field(validator=validators.optional(validators.instance_of(date)))
+    """
+    Date, timezone and (optionally) datetime in UTC.
+
+    Todoist provides a date and (optionally) a datetime and timezone.
+
+    Todoist expects a local date or utc datetime
+
+    Timezone defaults to utc if not given.
+    """
+
+    date_obj: date = field(validator=validators.instance_of(date))
     datetime_utc: datetime = field(
         default=None, validator=validators.optional(validators.instance_of(datetime))
     )
-    timezone_string: str = field(
-        default="UTC",
+    timezone: timezone = field(
+        default=utc,
         eq=False,
-        validator=validators.optional(validators.instance_of(str)),
-    )  # TODO is this what we want? Need to add test
+        validator=validators.instance_of(tzinfo),
+    )
 
     @classmethod
-    def from_date(cls, date_obj: date) -> TodoistDatetime:
-        return cls(date_obj, None, None)
+    def from_date(cls, date_obj: date, tz: timezone = utc) -> TodoistDatetime:
+        """Defaults to utc if timezone is not provided"""
+
+        return cls(date_obj, None, tz)
 
     @classmethod
     def from_datetime(cls, datetime_obj: datetime) -> TodoistDatetime:
+        """Defaults to utc if timezone is not set on datetime_obj"""
+
         date_obj = datetime_obj.date()
 
-        if datetime_obj.tzinfo:
-            timezone_string = str(datetime_obj.tzinfo)
-            local_datetime = datetime_obj
-        else:
-            timezone_string = "UTC"
-            local_datetime = timezone(timezone_string).localize(datetime_obj)
-
+        local_datetime = (
+            datetime_obj if datetime_obj.tzinfo else utc.localize(datetime_obj)
+        )
         datetime_utc = local_datetime.astimezone(utc)
-        return cls(date_obj, datetime_utc, timezone_string)
+
+        return cls(date_obj, datetime_utc, local_datetime.tzinfo)
 
     @classmethod
     def from_strings(
         cls,
         date_string: str,
+        timezone_string: str,
         datetime_string_utc: str = None,
-        timezone_string: str = "UTC",
     ) -> TodoistDatetime:
         date_obj = date.fromisoformat(date_string) if date_string else None
 
@@ -58,11 +77,12 @@ class TodoistDatetime:
 
             datetime_obj = utc.localize(datetime.strptime(datetime_string_utc, format))
 
-        return cls(date_obj, datetime_obj, timezone_string)
+        try:
+            tz = timezone(timezone_string)
+        except UnknownTimeZoneError:
+            tz = get_timezone_from_offset(timezone_string)
 
-    def __attrs_post_init__(self) -> TodoistDatetime:
-        if self.datetime_utc is None:
-            self.timezone_string = None
+        return cls(date_obj, datetime_obj, tz)
 
     def to_date_string(self) -> bool:
         return self.date_obj.isoformat()
@@ -76,6 +96,12 @@ class TodoistDatetime:
             .astimezone(timezone(self.timezone_string))
             .isoformat()
         )
+
+    def to_date(self) -> date:
+        return self.date_obj
+
+    def to_datetime_utc(self) -> datetime:
+        return self.datetime_utc
 
     def contains_time(self) -> bool:
         return self.datetime_utc is not None
