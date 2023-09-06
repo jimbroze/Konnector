@@ -96,7 +96,7 @@ class TodoistDatetime:
         return self.date_obj.isoformat()
 
     def to_datetime_string_utc(self) -> bool:
-        return self.datetime_utc.isoformat("T", "microseconds")
+        return self.to_datetime_utc().isoformat("T", "microseconds")
 
     def to_datetime_string_local(self) -> bool:
         return (
@@ -109,7 +109,11 @@ class TodoistDatetime:
         return self.date_obj
 
     def to_datetime_utc(self) -> datetime:
-        return self.datetime_utc
+        return (
+            self.datetime_utc
+            if self.datetime_utc
+            else datetime.combine(self.date_obj, datetime.min.time(), self.timezone)
+        )
 
     def contains_time(self) -> bool:
         return self.datetime_utc is not None

@@ -90,6 +90,14 @@ class TestTodoistDateTime:
         assert todoist_datetime.timezone == utc
 
     @pytest.mark.unit
+    def test_toDatetimeUtc_converts_date_to_datetime(self):
+        todoist_datetime = TodoistDatetime.from_strings("2023-07-10", "UTC")
+
+        assert todoist_datetime.to_datetime_utc() == datetime(
+            2023, 7, 10, 0, 0, 0, 0, utc
+        )
+
+    @pytest.mark.unit
     def test_toDatetimeStringUtc_keeps_utc_datetime(self):
         todoist_datetime = TodoistDatetime.from_strings(
             "2023-07-10", "UTC", "2023-07-10T08:05:02.000000Z"

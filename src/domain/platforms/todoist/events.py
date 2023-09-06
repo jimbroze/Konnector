@@ -1,14 +1,14 @@
+from datetime import datetime
+from attrs import frozen
+
 from infrastructure.events import Event
 from domain.platforms.todoist.item import TodoistItem
 
-from datetime import datetime
 
-
-# TODO is this actually needed?
+@frozen
 class TodoistItemEvent(Event):
     todoist_item: TodoistItem
     event_time: datetime
-    item_list: str
 
 
 class NewTodoistItemCreated(TodoistItemEvent):

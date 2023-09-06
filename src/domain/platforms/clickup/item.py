@@ -110,6 +110,12 @@ class ClickupItem:
             },
         )
 
+    def add_custom_field(self, id: str, value: str):
+        self.custom_fields[id] = value
+
+    def get_custom_field(self, id: str) -> dict:
+        return self.custom_fields[id]
+
     # @property
     # def is_complete(self) -> bool:
     #     return self.status == self._complete_status
@@ -118,7 +124,3 @@ class ClickupItem:
     # def is_complete(self, value: bool):
     #     if value:
     #         self.status = self._complete_status
-
-    # def get_custom_fields(self) -> dict:
-    #     """Get a dictionary of custom fields"""
-    #     pass

@@ -32,7 +32,7 @@ class TodoistItem:
 
     def __init__(
         self,
-        content: dict,
+        content: str,
         id: str = None,
         description: bool = None,
         priority: TodoistPriority = None,
