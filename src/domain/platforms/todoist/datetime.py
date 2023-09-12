@@ -42,7 +42,9 @@ class TodoistDatetime:
         return cls(date_obj, None, tz)
 
     @classmethod
-    def from_datetime(cls, datetime_obj: datetime) -> TodoistDatetime:
+    def from_datetime(
+        cls, datetime_obj: datetime, time_included: bool = True
+    ) -> TodoistDatetime:
         """Defaults to utc if timezone is not set on datetime_obj"""
 
         date_obj = datetime_obj.date()
@@ -50,7 +52,7 @@ class TodoistDatetime:
         local_datetime = (
             datetime_obj if datetime_obj.tzinfo else utc.localize(datetime_obj)
         )
-        datetime_utc = local_datetime.astimezone(utc)
+        datetime_utc = local_datetime.astimezone(utc) if time_included else None
 
         return cls(date_obj, datetime_utc, local_datetime.tzinfo)
 

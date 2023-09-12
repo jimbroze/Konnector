@@ -18,7 +18,10 @@ class TestMoveNewTodoistItemToClickup:
     def event_handler(self) -> MoveNewTodoistItemToClickup:
         clickup_mock = Mock(ClickupRepository)
         todoist_mock = Mock(TodoistRepository)
-        event_handler = MoveNewTodoistItemToClickup(clickup_mock, todoist_mock)
+        event_handler = MoveNewTodoistItemToClickup(
+            todoist_mock,
+            clickup_mock,
+        )
         yield event_handler
 
     # def teardown_method(self):
@@ -70,10 +73,10 @@ class TestMoveNewTodoistItemToClickup:
         clickup_datetime = event_handler.todoist_datetime_to_clickup(todoist_datetime)
 
         # Clickup sets timeless dates to 4am local
-        assert clickup_date.to_datetime() == datetime(2023, 11, 10, 4, 0, 0, 0, utc)
+        assert clickup_date.to_datetime_utc() == datetime(2023, 11, 10, 4, 0, 0, 0, utc)
         assert clickup_date.contains_time() is False
 
-        assert clickup_datetime.to_datetime() == datetime(
+        assert clickup_datetime.to_datetime_utc() == datetime(
             2023, 11, 10, 14, 23, 54, 0, utc
         )
         assert clickup_datetime.contains_time() is True
@@ -93,12 +96,12 @@ class TestMoveNewTodoistItemToClickup:
         clickup_datetime = event_handler.todoist_datetime_to_clickup(todoist_datetime)
 
         # Clickup sets timeless dates to 4am local
-        assert clickup_date.to_datetime() == datetime(
+        assert clickup_date.to_datetime_utc() == datetime(
             2023, 11, 10, 4, 0, 0, 0, timezone("America/Tijuana")
         )
         assert clickup_date.contains_time() is False
 
-        assert clickup_datetime.to_datetime() == datetime(
+        assert clickup_datetime.to_datetime_utc() == datetime(
             2023, 11, 10, 14, 23, 54, 0, timezone("America/Tijuana")
         )
         assert clickup_datetime.contains_time() is True
@@ -155,8 +158,6 @@ class TestMoveNewTodoistItemToClickup:
         event = NewTodoistItemCreated(
             todoist_item, datetime(2023, 9, 5, 8, 45, 0, 0, utc)
         )
-
-        converted_clickup_item = event_handler.todoist_item_to_clickup(todoist_item)
 
         event_handler.handle(event)
 

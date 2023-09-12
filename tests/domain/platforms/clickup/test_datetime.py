@@ -149,7 +149,7 @@ class TestClickupDateTime:
             datetime(2023, 7, 10, 8, 5, 2, 0, timezone("Europe/Moscow"))
         )
 
-        dt = clickup_datetime.to_datetime()
+        dt = clickup_datetime.to_datetime_utc()
 
         assert (
             dt.timestamp()

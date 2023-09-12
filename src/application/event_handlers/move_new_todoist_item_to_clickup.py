@@ -11,9 +11,13 @@ class MoveNewTodoistItemToClickup(EventHandler):
     clickup_projects = {"inbox": "38260663"}
     todoist_id_in_clickup = "550a93a0-6978-4664-be6d-777cc0d7aff6"
 
-    def __init__(self, clickup: ClickupRepository, todoist: TodoistRepository):
-        self.clickup = clickup
+    def __init__(
+        self,
+        todoist: TodoistRepository,
+        clickup: ClickupRepository,
+    ):
         self.todoist = todoist
+        self.clickup = clickup
 
     def handle(self, event: NewTodoistItemCreated) -> ClickupItem:
         if event.todoist_item.project_id not in [

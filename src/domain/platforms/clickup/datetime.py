@@ -71,7 +71,7 @@ class ClickupDatetime:
     def to_timestamp_seconds(self) -> int:
         return self.timestamp_milli / 1000
 
-    def to_datetime(self) -> datetime:
+    def to_datetime_utc(self) -> datetime:
         return datetime.fromtimestamp(self.timestamp_milli / 1000, timezone("UTC"))
 
     def contains_time(self) -> bool:
