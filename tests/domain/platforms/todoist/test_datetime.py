@@ -2,7 +2,10 @@ import pytest
 from datetime import date, datetime
 from pytz import timezone, utc
 
-from domain.platforms.todoist.item_datetime import TodoistDatetime, get_timezone_from_offset
+from domain.platforms.todoist.item_datetime import (
+    TodoistDatetime,
+    get_timezone_from_offset,
+)
 
 
 class TestTodoistDateTime:
