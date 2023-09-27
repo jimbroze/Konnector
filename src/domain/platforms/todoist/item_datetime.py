@@ -1,6 +1,7 @@
 from __future__ import annotations
+from typing import Optional
 from attrs import define, field, validators
-from item_datetime import datetime, date, tzinfo, timedelta, timezone as offset_timezone
+from datetime import datetime, date, tzinfo, timedelta, timezone as offset_timezone
 from pytz import timezone, utc, UnknownTimeZoneError
 from re import match
 
@@ -26,7 +27,7 @@ class TodoistDatetime:
     """
 
     date_obj: date = field(validator=validators.instance_of(date))
-    datetime_utc: datetime = field(
+    datetime_utc: Optional[datetime] = field(
         default=None, validator=validators.optional(validators.instance_of(datetime))
     )
     timezone: timezone = field(
@@ -94,16 +95,16 @@ class TodoistDatetime:
 
         return cls(date_obj, datetime_obj, tz)
 
-    def to_date_string(self) -> bool:
+    def to_date_string(self) -> str:
         return self.date_obj.isoformat()
 
-    def to_datetime_string_utc(self) -> bool:
+    def to_datetime_string_utc(self) -> str:
         return self.to_datetime_utc().isoformat("T", "microseconds")
 
-    def to_datetime_string_local(self) -> bool:
+    def to_datetime_string_local(self) -> str:
         return (
             utc.localize(self.datetime_utc)
-            .astimezone(timezone(self.timezone_string))
+            .astimezone(self.timezone)
             .isoformat()
         )
 

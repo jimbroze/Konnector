@@ -1,6 +1,6 @@
 from __future__ import annotations
 from attrs import define, field
-from item_datetime import datetime, date, time
+from datetime import datetime, date, time
 from pytz import timezone, utc
 
 
@@ -19,7 +19,7 @@ class ClickupDatetime:
     time_included: bool
 
     @classmethod
-    def from_timestamp(cls, timestamp: int, clickupTz: timezone) -> ClickupDatetime:
+    def from_timestamp(cls, timestamp: int, clickup_tz: timezone) -> ClickupDatetime:
         """
         Calculates if a timestamp includes time.
         Clickup sets null times to 4am in the local timezone.
@@ -29,7 +29,7 @@ class ClickupDatetime:
         )
 
         dt = datetime.fromtimestamp(timestamp_seconds, timezone("UTC"))
-        localDt = dt.astimezone(clickupTz)
+        localDt = dt.astimezone(clickup_tz)
 
         time_included = not (
             localDt.microsecond == 0
@@ -44,7 +44,7 @@ class ClickupDatetime:
         """Defaults to utc if timezone is not provided"""
 
         dt = datetime.combine(date_obj, time.min.replace(hour=4), tz)
-        return cls(dt.timestamp() * 1000, False)
+        return cls(int(dt.timestamp() * 1000), False)
 
     @classmethod
     def from_datetime(
@@ -69,7 +69,7 @@ class ClickupDatetime:
         return self.timestamp_milli
 
     def to_timestamp_seconds(self) -> int:
-        return self.timestamp_milli / 1000
+        return int(self.timestamp_milli / 1000)
 
     def to_datetime_utc(self) -> datetime:
         return datetime.fromtimestamp(self.timestamp_milli / 1000, timezone("UTC"))
