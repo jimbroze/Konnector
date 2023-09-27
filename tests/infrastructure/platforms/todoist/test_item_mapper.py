@@ -2,7 +2,7 @@ from datetime import datetime, date
 from pytz import utc
 import pytest
 
-from domain.platforms.todoist.datetime import TodoistDatetime
+from domain.platforms.todoist.item_datetime import TodoistDatetime
 from domain.platforms.todoist.priority import TodoistPriority
 from domain.platforms.todoist.item import TodoistItem
 from infrastructure.platforms.todoist.repository import TodoistItemMapper

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from attrs import define, field, validators
-from datetime import datetime, date, tzinfo, timedelta, timezone as offset_timezone
+from item_datetime import datetime, date, tzinfo, timedelta, timezone as offset_timezone
 from pytz import timezone, utc, UnknownTimeZoneError
 from re import match
 

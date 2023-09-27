@@ -1,6 +1,6 @@
 import pytest
 
-from domain.platforms.todoist.datetime import TodoistDatetime
+from domain.platforms.todoist.item_datetime import TodoistDatetime
 from domain.platforms.todoist.priority import TodoistPriority
 from domain.platforms.todoist.item import TodoistItem
 
