@@ -19,8 +19,8 @@ class TestSyncClickupItemToTodoist:
         clickup_mock = Mock(ClickupRepository)
         todoist_mock = Mock(TodoistRepository)
         event_handler = SyncClickupItemToTodoist(
-            todoist_mock,
             clickup_mock,
+            todoist_mock,
         )
         yield event_handler
 
@@ -162,7 +162,7 @@ class TestSyncClickupItemToTodoist:
             content="Task name",
             description="Task description",
             priority=TodoistPriority(3),
-            end_datetime=ClickupDatetime.from_date(date(2023, 11, 10), utc),
+            end_datetime=TodoistDatetime.from_date(date(2023, 11, 10), utc),
         )
 
         event_handler.todoist.get_item_by_id.return_value = todoist_item
@@ -196,7 +196,7 @@ class TestSyncClickupItemToTodoist:
             content="Task name",
             description="3857368",
             priority=TodoistPriority(3),
-            end_datetime=ClickupDatetime.from_date(date(2023, 11, 10), utc),
+            end_datetime=TodoistDatetime.from_date(date(2023, 11, 10), utc),
         )
 
         event_handler.todoist.get_item_by_id.return_value = None
@@ -231,10 +231,10 @@ class TestSyncClickupItemToTodoist:
             content="Task name",
             description="3857368",
             priority=TodoistPriority(3),
-            end_datetime=ClickupDatetime.from_date(date(2023, 11, 10), utc),
+            end_datetime=TodoistDatetime.from_date(date(2023, 11, 10), utc),
         )
 
-        event = ClickupItemUpdated(clickup_item, datetime(2023, 9, 5, 8, 45, 0, 0, utc))
+        event = ClickupItemUpdated("3857368", "38260663", "2511898")
 
         event_handler.next_actions_criteria = Mock(return_value=True)
         event_handler.get_clickup_item_in_todoist = Mock(return_value=todoist_item)
@@ -267,13 +267,14 @@ class TestSyncClickupItemToTodoist:
             content="Task name",
             description="3857368",
             priority=TodoistPriority(3),
-            end_datetime=ClickupDatetime.from_date(date(2023, 11, 10), utc),
+            end_datetime=TodoistDatetime.from_date(date(2023, 11, 10), utc),
         )
 
-        event = ClickupItemUpdated(clickup_item, datetime(2023, 9, 5, 8, 45, 0, 0, utc))
+        event = ClickupItemUpdated("3857368", "38260663", "2511898")
 
         event_handler.next_actions_criteria = Mock(return_value=True)
         event_handler.get_clickup_item_in_todoist = Mock(return_value=None)
+        event_handler.clickup.get_item_by_id.return_value = clickup_item
         event_handler.todoist.create_item.return_value = todoist_item
 
         result_todoist_item = event_handler.handle(event)
@@ -284,7 +285,7 @@ class TestSyncClickupItemToTodoist:
         assert result_todoist_item == todoist_item
 
     @pytest.mark.unit
-    def test_handle_deletes_clickup_item_if_does_not_matche_criteria_and_exists(
+    def test_handle_deletes_clickup_item_if_does_not_match_criteria_and_exists(
         self, event_handler: SyncClickupItemToTodoist
     ):
         clickup_item = ClickupItem(
@@ -303,10 +304,10 @@ class TestSyncClickupItemToTodoist:
             content="Task name",
             description="3857368",
             priority=TodoistPriority(3),
-            end_datetime=ClickupDatetime.from_date(date(2023, 11, 10), utc),
+            end_datetime=TodoistDatetime.from_date(date(2023, 11, 10), utc),
         )
 
-        event = ClickupItemUpdated(clickup_item, datetime(2023, 9, 5, 8, 45, 0, 0, utc))
+        event = ClickupItemUpdated("3857368", "38260663", "2511898")
 
         event_handler.next_actions_criteria = Mock(return_value=False)
         event_handler.get_clickup_item_in_todoist = Mock(return_value=todoist_item)

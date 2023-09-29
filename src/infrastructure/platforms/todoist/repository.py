@@ -199,17 +199,7 @@ class TodoistRepository:
 
         return TodoistItemMapper.to_entity(updated_item_properties, self.local_tz)
 
-    def delete_item_by_id(self, item_id: TodoistItem) -> bool:
-        """
-        Delete a item on Todoist's API.
-
-        Arguments:
-            item: The item to be deleted.
-
-        Returns:
-            If the operation was successful
-        """
-
+    def delete_item_by_id(self, item_id: str) -> bool:
         logger.debug(f"Trying to delete item from Todoist. Item_id: {item_id}")
 
         try:

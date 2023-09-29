@@ -34,7 +34,7 @@ class TodoistItem:
         self,
         content: str,
         id: str = None,
-        description: bool = None,
+        description: str = None,
         priority: TodoistPriority = None,
         end_datetime: TodoistDatetime = None,
         created_datetime: TodoistDatetime = None,

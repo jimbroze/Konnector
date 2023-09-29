@@ -29,43 +29,44 @@ class SyncClickupItemToTodoist(EventHandler):
         # ]:
         #     return
 
-        matches_criteria = self.next_actions_criteria(event)
+        clickup_item = self.clickup.get_item_by_id(event.item_id)
+
+        matches_criteria = self.next_actions_criteria(clickup_item)
 
         todoist_item = self.get_clickup_item_in_todoist(
-            event.clickup_item, "next_actions"
+            clickup_item, "next_actions"
         )
         if matches_criteria:
             if todoist_item:
-                todoist_result_item = self.todoist.update_item()
+                todoist_result_item = self.todoist.update_item(todoist_item)
             else:
                 todoist_result_item = self.todoist.create_item(
-                    self.clickup_item_to_todoist(event.clickup_item),
+                    self.clickup_item_to_todoist(clickup_item),
                     self.todoist_projects["next_actions"],
                 )
+            return todoist_result_item
         elif todoist_item:
             self.todoist.delete_item_by_id(todoist_item.id)
             return
 
-        return todoist_result_item
-
-    def next_actions_criteria(self, event: ClickupItemEvent) -> bool:
+    def next_actions_criteria(self, clickup_item: ClickupItem) -> bool:
         clickup_priority = (
-            event.clickup_item.priority.to_int()
-            if event.clickup_item.priority is not None
+            clickup_item.priority.to_int()
+            if clickup_item.priority is not None
             else None
         )
         clickup_due = (
-            event.clickup_item.end_datetime.to_datetime_utc()
-            if event.clickup_item.end_datetime is not None
+            clickup_item.end_datetime.to_datetime_utc()
+            if clickup_item.end_datetime is not None
             else None
         )
 
-        next_actions_criteria = event.clickup_item.status == "next action" and (
+        next_actions_criteria = clickup_item.status == "next action" and (
             clickup_priority is not None
             and clickup_priority < 3
             or clickup_due is not None
             and clickup_due < (datetime.utcnow() + timedelta(days=3))
-            or event.clickup_item.is_subtask() is False
+            or clickup_item.is_subtask() is False
         )
 
         return next_actions_criteria
@@ -99,7 +100,7 @@ class SyncClickupItemToTodoist(EventHandler):
         return todoist_item
 
     def clickup_priority_to_todoist(
-        self, clickup_priority: ClickupPriority
+        self, clickup_priority: Optional[ClickupPriority]
     ) -> TodoistPriority:
         """
         Clickup priorities are descending whereas Todoist priorities are ascending.
@@ -115,7 +116,7 @@ class SyncClickupItemToTodoist(EventHandler):
         )
 
     def clickup_datetime_to_todoist(
-        self, clickup_datetime: ClickupDatetime
+        self, clickup_datetime: Optional[ClickupDatetime]
     ) -> TodoistDatetime:
         return (
             TodoistDatetime.from_datetime(

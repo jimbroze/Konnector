@@ -2,13 +2,13 @@ from datetime import datetime
 from attrs import frozen
 
 from infrastructure.events import Event
-from domain.platforms.clickup.item import ClickupItem
 
 
 @frozen
 class ClickupItemEvent(Event):
-    clickup_item: ClickupItem
-    event_time: datetime
+    item_id: str
+    list_id: str
+    user_id: str
 
 
 class NewClickupItemCreated(ClickupItemEvent):

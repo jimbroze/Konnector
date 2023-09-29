@@ -26,7 +26,6 @@ def create_app(test_config: dict = None) -> Flask:
     # Register Controllers
     router = FlaskRouter(app, bus)
     router.register_routes()
-    # controller.clickup_webhook_handler()
 
     return app
 

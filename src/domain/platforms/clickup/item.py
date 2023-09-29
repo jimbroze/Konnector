@@ -5,40 +5,11 @@ from domain.platforms.clickup.priority import ClickupPriority
 
 
 class ClickupItem:
-    """
-    An item in a clickup list.
-
-    ...
-
-    Attributes
-    ----------
-    id : str
-        A unique identifier for the item
-    name : str
-        The name of the item
-    description : str
-        A description of the item
-    priority : ClickupPriority
-        The item's importance
-    start_datetime : ClickupDatetime
-        When the item starts
-    end_datetime : ClickupDatetime
-        When the item ends
-    created_datetime : ClickupDatetime
-        When the item was created
-    updated_datetime : ClickupDatetime
-        When the item was last updated
-    status : str
-        The current status of the item
-    custom_fields : dict
-        A dictionary of custom fields with the id as the key
-    """
-
     def __init__(
         self,
-        name: dict,
+        name: str,
         id: str = None,
-        description: bool = None,
+        description: str = None,
         priority: ClickupPriority = None,
         start_datetime: ClickupDatetime = None,
         end_datetime: ClickupDatetime = None,
@@ -113,7 +84,7 @@ class ClickupItem:
     def add_custom_field(self, id: str, value: str):
         self.custom_fields[id] = value
 
-    def get_custom_field(self, id: str) -> dict:
+    def get_custom_field(self, id: str) -> str:
         return self.custom_fields[id]
 
     # @property

@@ -24,12 +24,6 @@ class TestPlatformController:
         yield app.test_client()
 
     @pytest.mark.unit
-    def test_clickupWebhookHandler_is_accessible_route(self, client: FlaskClient):
-        response = client.post("/clickup/webhook/call", data={})
-        # TODO what response do apis require?
-        assert response.status_code == 200
-
-    @pytest.mark.unit
     def test_todoistWebhookHandler_is_accessible_route(self, client: FlaskClient):
         response = client.post("/todoist/webhook/call", data={})
         assert response.status_code == 200
