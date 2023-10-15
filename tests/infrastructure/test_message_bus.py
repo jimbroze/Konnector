@@ -36,20 +36,20 @@ class TestMessageBus:
     @pytest.mark.unit
     def test_register_adds_events_to_register(self):
         test_event = TestEvent()
-        messageBus = MessageBus(self.event_mappings)
+        message_bus = MessageBus(self.event_mappings)
 
-        messageBus.register(test_event)
+        message_bus.register(test_event)
 
-        assert len(messageBus.registered_events) == 1
-        assert test_event in messageBus.registered_events
+        assert len(message_bus.registered_events) == 1
+        assert test_event in message_bus.registered_events
 
     @pytest.mark.unit
     def test_register_throws_exception_if_not_event(self):
         test_event = InvalidTestEvent()
-        messageBus = MessageBus(self.event_mappings)
+        message_bus = MessageBus(self.event_mappings)
 
         with pytest.raises(TypeError) as excinfo:
-            messageBus.register(test_event)
+            message_bus.register(test_event)
 
         assert "Only an Event can be registered in the message bus" in str(
             excinfo.value
@@ -61,10 +61,10 @@ class TestMessageBus:
         event_mappings: dict[Event, EventHandler] = {
             TestEvent: [handler_mock],
         }
-        messageBus = MessageBus(event_mappings)
-        messageBus.registered_events = [TestEvent()]
+        message_bus = MessageBus(event_mappings)
+        message_bus.registered_events = [TestEvent()]
 
-        messageBus.handle_events()
+        message_bus.handle_events()
 
         handler_mock.handle.assert_called_once()
 
@@ -74,11 +74,11 @@ class TestMessageBus:
         event_mappings: dict[Event, EventHandler] = {
             TestEvent: [handler_mock],
         }
-        messageBus = MessageBus(event_mappings)
-        messageBus.registered_events = [TestEvent()]
+        message_bus = MessageBus(event_mappings)
+        message_bus.registered_events = [TestEvent()]
 
-        assert len(messageBus.registered_events) == 1
+        assert len(message_bus.registered_events) == 1
 
-        messageBus.handle_events()
+        message_bus.handle_events()
 
-        assert len(messageBus.registered_events) == 0
+        assert len(message_bus.registered_events) == 0
