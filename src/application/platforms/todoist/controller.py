@@ -1,24 +1,22 @@
 import logging
 
-from requests import Request
-from webob import Response
+from werkzeug.wrappers import Request, Response
 
-from infrastructure.message_bus import MessageBus
+from infrastructure.message_bus import IMessageBus
 from domain.platforms.todoist.events import NewTodoistItemCreated
 
 logger = logging.getLogger("gunicorn.error")
 
 class TodoistController:
-    def __init__(self, bus: MessageBus):
+    def __init__(self, bus: IMessageBus):
         self.bus = bus
 
     def todoist_webhook_handler(self, request: Request):
         try:
-            # return make_response(jsonify({"status": "success"}), 200)
-            return "", 200
-        except Exception as e:
-            logger.warning(f"Error in processing clickup webhook: {e}")
+            pass
 
-        finally:
-            return Response("", 200)
-            # Response accepted. Not necessarily success
+        except Exception as e:
+            logger.warning(f"Error in processing clickup webhook: {repr(e)}")
+
+        return Response("", 200)
+        # Response accepted. Not necessarily success

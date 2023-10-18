@@ -1,12 +1,15 @@
 import json
 import logging
-# from requests import Request
-from webob import Response, Request
+from werkzeug.wrappers import Request, Response
+from werkzeug.exceptions import Unauthorized
+
 from application.bootstrap.bootstrap import clickup_webhook_auth
+# TODO where should this file go?
+from application.exceptions import EventNotFoundException
 
 from application.platforms.clickup.auth import ClickupAuthenticator
 from domain.platforms.clickup.events import NewClickupItemCreated, ClickupItemUpdated
-from infrastructure.message_bus import MessageBus
+from infrastructure.message_bus import IMessageBus
 
 # TODO move auth to just using constructor?
 
@@ -16,6 +19,7 @@ logger = logging.getLogger("gunicorn.error")
 
 
 def create_event(request_data: dict):
+    print(request_data)
     user_id_str = str(request_data["history_items"][0]["user"]["id"])
     task_id_str = str(request_data["task_id"])
     event_type = request_data["event"]
@@ -27,11 +31,13 @@ def create_event(request_data: dict):
     if event_type == "taskUpdated":
         return ClickupItemUpdated(task_id_str, list_id_str, user_id_str)
 
+    raise EventNotFoundException(f"Clickup event type '{event_type} is not recognised")
+
 
 class ClickupController:
     def __init__(
         self,
-        bus: MessageBus,
+        bus: IMessageBus,
         authenticator: ClickupAuthenticator = clickup_webhook_auth,
     ):
         self.bus = bus
@@ -41,24 +47,20 @@ class ClickupController:
         try:
             self.authenticator.authenticate(request)
 
-            request_data = json.loads(request.json)
-
-            # for historyItem in request_data["history_items"]:
-            #     if (
-            #         historyItem["field"] == "status"
-            #         and historyItem["after"]["status"] == "complete"
-            #     ):
-            #         event = "task_complete"
-            #         break
+            request_data = request.json
 
             event = create_event(request_data)
 
             self.bus.register(event)
             self.bus.handle_events()
 
-        except Exception as e:
-            logger.warning(f"Error in processing clickup webhook: {e}")
-
-        finally:
-            return Response("", 200)
+        except Unauthorized as e:
+            logger.warning(f"Error in processing clickup webhook: {repr(e)}")
+            return e.get_response()
             # Response accepted. Not necessarily success
+
+        except Exception as e:
+            logger.warning(f"Error in processing clickup webhook: {repr(e)}")
+
+        return Response("", 200)
+        # Response accepted. Not necessarily success

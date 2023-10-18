@@ -1,4 +1,3 @@
-from typing import Type
 
 from infrastructure.events import Event, EventHandler
 from domain.platforms.todoist.events import NewTodoistItemCreated
@@ -11,7 +10,7 @@ from application.event_handlers.sync_clickup_item_to_todoist import (
 )
 
 # TODO is update called on creation?
-EVENT_MAPPINGS: dict[Type[Event], [Type[EventHandler]]] = {
+EVENT_MAPPINGS: dict[type[Event], list[type[EventHandler]]] = {
     NewTodoistItemCreated: [MoveNewTodoistItemToClickup],
     NewClickupItemCreated: [SyncClickupItemToTodoist],
     ClickupItemUpdated: [SyncClickupItemToTodoist],

@@ -1,2 +1,2 @@
-class AuthenticationException(Exception):
+class EventNotFoundException(Exception):
     pass

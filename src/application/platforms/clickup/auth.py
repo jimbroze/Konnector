@@ -1,8 +1,7 @@
 import hashlib
 import hmac
-import requests
-
-import application.exceptions as exceptions
+from werkzeug.wrappers import Request
+from werkzeug.exceptions import Unauthorized
 
 
 class ClickupAuthenticator:
@@ -11,12 +10,15 @@ class ClickupAuthenticator:
     def __init__(self, secret: str):
         self.secret = secret
 
-    def authenticate(self, request: requests.Request):
+    def authenticate(self, request: Request):
         calculated_hmac = hmac.new(
             bytes(self.secret, "utf-8"),
             msg=request.data,
             digestmod=hashlib.sha256,
         ).hexdigest()
 
+        if self.signatureKey not in request.headers:
+            raise Unauthorized("Missing X-Signature header")
+
         if request.headers[self.signatureKey] != calculated_hmac:
-            raise exceptions.AuthenticationException("Incorrect HMAC")
+            raise Unauthorized("Incorrect HMAC")
