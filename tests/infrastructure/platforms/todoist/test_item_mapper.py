@@ -9,7 +9,6 @@ from infrastructure.platforms.todoist.repository import TodoistItemMapper
 
 
 class TestTodoistItemMapper:
-    @pytest.mark.unit
     def test_to_entity_converts_API_data_to_entity(self):
         # GIVEN
         api_response = todoist_item_response
@@ -30,7 +29,6 @@ class TestTodoistItemMapper:
         assert todoist_item.is_completed is False
         assert todoist_item.project_id == "2203306141"
 
-    @pytest.mark.unit
     def test_to_entity_handles_null_values(self):
         # GIVEN
         api_response = todoist_empty_response
@@ -44,7 +42,6 @@ class TestTodoistItemMapper:
         assert todoist_item.description == ""
         assert todoist_item.end_datetime is None
 
-    @pytest.mark.unit
     def test_from_entity_converts_entity_to_API_Data(self):
         # GIVEN
         todoist_item = TodoistItem(
@@ -69,7 +66,6 @@ class TestTodoistItemMapper:
         assert "is_completed" not in todoist_dict
         assert todoist_dict["project_id"] == "2203306141"
 
-    @pytest.mark.unit
     def test_from_entity_with_date_has_no_datetime(self):
         # GIVEN
         todoist_item = TodoistItem(
@@ -84,7 +80,6 @@ class TestTodoistItemMapper:
         assert todoist_dict["due_date"] == "2022-12-08"
         assert "due_datetime" not in todoist_dict
 
-    @pytest.mark.unit
     def test_from_entity_with_datetime_has_no_date(self):
         # GIVEN
         todoist_item = TodoistItem(
@@ -99,7 +94,6 @@ class TestTodoistItemMapper:
         assert "due_date" not in todoist_dict
         assert todoist_dict["due_datetime"] == "2022-12-08T12:00:00.000000+00:00"
 
-    @pytest.mark.unit
     def test_from_entity_handles_null_values(self):
         # GIVEN
         todoist_item = TodoistItem(content="A task")

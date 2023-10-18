@@ -20,12 +20,10 @@ class TestFlaskApp:
     def client(self, app: Flask) -> FlaskClient:
         yield app.test_client()
 
-    @pytest.mark.unit
     def test_config(self):
         assert not create_app().testing
         assert create_app({"TESTING": True}).testing
 
-    @pytest.mark.unit
     def test_hello(self, client: FlaskClient):
         response = client.get("/healthcheck")
         assert response.data == b"Everything is golden!"

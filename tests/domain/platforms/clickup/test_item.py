@@ -7,7 +7,6 @@ from domain.platforms.clickup.item import ClickupItem
 
 
 class TestClickupItem:
-    @pytest.mark.unit
     def test_item_requires_a_name(self):
         # GIVEN
         with pytest.raises(TypeError) as excinfo:
@@ -17,7 +16,6 @@ class TestClickupItem:
         # THEN
         assert "required positional argument" in str(excinfo.value)
 
-    @pytest.mark.unit
     def test_subtraction_with_same_params(self):
         # GIVEN
         tz = timezone("Europe/London")
@@ -67,7 +65,6 @@ class TestClickupItem:
         assert newItem.status is None
         assert newItem.custom_fields == {}
 
-    @pytest.mark.unit
     def test_subtraction_with_different_params(self):
         # GIVEN
         tz = timezone("Europe/London")
@@ -121,7 +118,6 @@ class TestClickupItem:
             "550a93a0-6978-4664-be6d-777cc0d7aff6": "5326456282"
         }
 
-    @pytest.mark.unit
     def test_subtraction_with_missing_params(self):
         # GIVEN
         tz = timezone("Europe/London")

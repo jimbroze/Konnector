@@ -6,7 +6,6 @@ from domain.platforms.todoist.item import TodoistItem
 
 
 class TestTodoistItem:
-    @pytest.mark.unit
     def test_item_requires_content(self):
         # GIVEN
         with pytest.raises(TypeError) as excinfo:
@@ -16,13 +15,11 @@ class TestTodoistItem:
         # THEN
         assert "required positional argument" in str(excinfo.value)
 
-    @pytest.mark.unit
     def test_only_content_required(self):
         item = TodoistItem(content="some content")
 
         assert item.content == "some content"
 
-    @pytest.mark.unit
     def test_subtraction_with_same_params(self):
         # GIVEN
         item_a = TodoistItem(
@@ -64,7 +61,6 @@ class TestTodoistItem:
         assert newItem.updated_datetime is None
         assert newItem.is_completed is None
 
-    @pytest.mark.unit
     def test_subtraction_with_different_params(self):
         # GIVEN
         item_a = TodoistItem(
@@ -109,7 +105,6 @@ class TestTodoistItem:
         )
         assert newItem.is_completed is True
 
-    @pytest.mark.unit
     def test_subtraction_with_missing_params(self):
         # GIVEN
         item_a = TodoistItem(

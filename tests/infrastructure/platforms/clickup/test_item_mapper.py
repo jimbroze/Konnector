@@ -9,7 +9,6 @@ from infrastructure.platforms.clickup.repository import ClickupItemMapper
 
 
 class TestClickupItemMapper:
-    @pytest.mark.unit
     def test_to_entity_converts_API_data_to_entity(self):
         # GIVEN
         tz = timezone("Europe/London")
@@ -33,7 +32,6 @@ class TestClickupItemMapper:
             "550a93a0-6978-4664-be6d-777cc0d7aff6": "6410254717"
         }
 
-    @pytest.mark.unit
     def test_to_entity_handles_null_values(self):
         # GIVEN
         tz = timezone("Europe/London")
@@ -49,7 +47,6 @@ class TestClickupItemMapper:
         assert clickup_item.end_datetime is None
         assert clickup_item.custom_fields == {}
 
-    @pytest.mark.unit
     def test_to_entity_handles_empty_custom_fields(self):
         # GIVEN
         tz = timezone("Europe/London")
@@ -67,7 +64,6 @@ class TestClickupItemMapper:
             "f1e52dc5-0b71-4d4b-86f1-2d6c45d31b01": None,
         }
 
-    @pytest.mark.unit
     def test_from_entity_converts_entity_to_API_Data(self):
         # GIVEN
         clickup_item = ClickupItem(
@@ -104,7 +100,6 @@ class TestClickupItemMapper:
             }
         ]
 
-    @pytest.mark.unit
     def test_from_entity_handles_null_values(self):
         # GIVEN
         clickup_item = ClickupItem(name="A task")

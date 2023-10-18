@@ -23,13 +23,11 @@ class TestFlaskRouter:
     def client(self, app: Flask) -> FlaskClient:
         yield app.test_client()
 
-    @pytest.mark.unit
     def test_Clickup_webhook_handler_is_an_accessible_route(self, client: FlaskClient):
         response = client.post("/clickup/webhook/call", data={})
         # TODO what response do apis require?
         assert response.status_code != 404
 
-    @pytest.mark.unit
     def test_Todoist_webhook_handler_is_an_accessible_route(self, client: FlaskClient):
         response = client.post("/todoist/webhook/call", data={})
         assert response.status_code != 404

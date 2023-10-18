@@ -28,7 +28,6 @@ class TestSyncClickupItemToTodoist:
     #     self.test_event = None
     #     self.event_mappings = {}
 
-    @pytest.mark.unit
     def test_clickupPriorityToTodoist_converts_priority(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -50,7 +49,6 @@ class TestSyncClickupItemToTodoist:
         assert todoist_priority_low.to_int() == 4
         assert todoist_priority_high.to_int() == 1
 
-    @pytest.mark.unit
     def test_clickupPriorityToTodoist_keeps_null_priority(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -60,7 +58,6 @@ class TestSyncClickupItemToTodoist:
 
         assert todoist_priority is None
 
-    @pytest.mark.unit
     def test_clickupDatetimeToTodoist_converts_utc_datetime(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -80,7 +77,6 @@ class TestSyncClickupItemToTodoist:
         )
         assert todoist_datetime.contains_time() is True
 
-    @pytest.mark.unit
     def test_clickupDatetimeToTodoist_converts_non_utc_datetime(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -108,7 +104,6 @@ class TestSyncClickupItemToTodoist:
         )
         assert todoist_datetime.contains_time() is True
 
-    @pytest.mark.unit
     def test_clickupDatetimeToTodoist_keeps_null_datetime(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -118,7 +113,6 @@ class TestSyncClickupItemToTodoist:
 
         assert todoist_datetime is None
 
-    @pytest.mark.unit
     def test_clickupItemToTodoist_converts_clickup_item_to_todoist(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -142,7 +136,6 @@ class TestSyncClickupItemToTodoist:
             date(2023, 11, 10), utc
         )
 
-    @pytest.mark.unit
     def test_getClickupItemInTodoist_correctly_gets_todoist_item_given_id(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -176,7 +169,6 @@ class TestSyncClickupItemToTodoist:
         event_handler.todoist.get_items.assert_not_called()
         assert result_todoist_item == todoist_item
 
-    @pytest.mark.unit
     def test_getClickupItemInTodoist_correctly_gets_todoist_item_given_missing_id(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -211,7 +203,6 @@ class TestSyncClickupItemToTodoist:
         assert event_handler.todoist.get_item_by_id.call_args.args[0] == "4513648"
         assert result_todoist_item == todoist_item
 
-    @pytest.mark.unit
     def test_handle_updates_clickup_item_if_matches_criteria_and_exists(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -247,7 +238,6 @@ class TestSyncClickupItemToTodoist:
         event_handler.todoist.delete_item_by_id.assert_not_called()
         assert result_todoist_item == todoist_item
 
-    @pytest.mark.unit
     def test_handle_creates_clickup_item_if_matches_criteria_and_does_not_exist(
         self, event_handler: SyncClickupItemToTodoist
     ):
@@ -284,7 +274,6 @@ class TestSyncClickupItemToTodoist:
         event_handler.todoist.delete_item_by_id.assert_not_called()
         assert result_todoist_item == todoist_item
 
-    @pytest.mark.unit
     def test_handle_deletes_clickup_item_if_does_not_match_criteria_and_exists(
         self, event_handler: SyncClickupItemToTodoist
     ):

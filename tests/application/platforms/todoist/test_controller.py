@@ -23,7 +23,6 @@ class TestPlatformController:
     def client(self, app: Flask) -> FlaskClient:
         yield app.test_client()
 
-    @pytest.mark.unit
     def test_todoistWebhookHandler_is_accessible_route(self, client: FlaskClient):
         response = client.post("/todoist/webhook/call", data={})
         assert response.status_code == 200

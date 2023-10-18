@@ -28,7 +28,6 @@ class TestMoveNewTodoistItemToClickup:
     #     self.test_event = None
     #     self.event_mappings = {}
 
-    @pytest.mark.unit
     def test_todoistPriorityToClickup_converts_priority(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
@@ -50,7 +49,6 @@ class TestMoveNewTodoistItemToClickup:
         assert clickup_priority_mid.to_int() == 2
         assert clickup_priority_high.to_int() == 1
 
-    @pytest.mark.unit
     def test_todoistPriorityToClickup_keeps_null_priority(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
@@ -60,7 +58,6 @@ class TestMoveNewTodoistItemToClickup:
 
         assert clickup_priority is None
 
-    @pytest.mark.unit
     def test_todoistDatetimeToClickup_converts_utc_datetime(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
@@ -81,7 +78,6 @@ class TestMoveNewTodoistItemToClickup:
         )
         assert clickup_datetime.contains_time() is True
 
-    @pytest.mark.unit
     def test_todoistDatetimeToClickup_converts_non_utc_datetime(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
@@ -106,7 +102,6 @@ class TestMoveNewTodoistItemToClickup:
         )
         assert clickup_datetime.contains_time() is True
 
-    @pytest.mark.unit
     def test_todoistDatetimeToClickup_keeps_null_datetime(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
@@ -116,7 +111,6 @@ class TestMoveNewTodoistItemToClickup:
 
         assert clickup_datetime is None
 
-    @pytest.mark.unit
     def test_todoistItemToClickup_converts_todoist_item_to_clickup(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
@@ -142,7 +136,6 @@ class TestMoveNewTodoistItemToClickup:
             == "3857368"
         )
 
-    @pytest.mark.unit
     def test_handle_moves_todoist_item_to_clickup(
         self, event_handler: MoveNewTodoistItemToClickup
     ):

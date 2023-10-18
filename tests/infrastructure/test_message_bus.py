@@ -33,7 +33,6 @@ class TestMessageBus:
         self.test_event = None
         self.event_mappings = {}
 
-    @pytest.mark.unit
     def test_register_adds_events_to_register(self):
         test_event = TestEvent()
         message_bus = MessageBus(self.event_mappings)
@@ -43,7 +42,6 @@ class TestMessageBus:
         assert len(message_bus.registered_events) == 1
         assert test_event in message_bus.registered_events
 
-    @pytest.mark.unit
     def test_register_throws_exception_if_not_event(self):
         test_event = InvalidTestEvent()
         message_bus = MessageBus(self.event_mappings)
@@ -55,7 +53,6 @@ class TestMessageBus:
             excinfo.value
         )
 
-    @pytest.mark.unit
     def test_handle_calls_handle_method(self):
         handler_mock = Mock(EventHandler)
         event_mappings: dict[Event, EventHandler] = {
@@ -68,7 +65,6 @@ class TestMessageBus:
 
         handler_mock.handle.assert_called_once()
 
-    @pytest.mark.unit
     def test_handle_removes_event_from_register(self):
         handler_mock = Mock(EventHandler)
         event_mappings: dict[Event, EventHandler] = {

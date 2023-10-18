@@ -1,6 +1,5 @@
 from unittest.mock import Mock
 import pytest
-from pretend import stub
 from werkzeug.wrappers import Request
 from werkzeug.test import EnvironBuilder
 
@@ -86,7 +85,6 @@ class TestClickupController:
         builder = EnvironBuilder(json=data)
         yield builder.get_request()
 
-    @pytest.mark.unit
     def test_clickup_webhooks_return_success_if_authenticated(self, message_bus: MessageBus, empty_request: Request):
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
@@ -95,7 +93,6 @@ class TestClickupController:
 
         assert response.status_code == 200
 
-    @pytest.mark.unit
     def test_clickup_webhooks_get_authenticated(self, message_bus: MessageBus, empty_request: Request):
         authenticator = ClickupAuthenticator("secret")
         controller = ClickupController(message_bus, authenticator)
@@ -104,7 +101,6 @@ class TestClickupController:
 
         assert response.status_code == 401
 
-    @pytest.mark.unit
     def test_clickup_webhook_handler_recognises_a_taskCreated_event(self, message_bus: FakeMessageBus, webhook_request: Request):
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
