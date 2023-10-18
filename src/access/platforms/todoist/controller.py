@@ -2,10 +2,10 @@ import logging
 
 from werkzeug.wrappers import Request, Response
 
-from infrastructure.message_bus import IMessageBus
-from domain.platforms.todoist.events import NewTodoistItemCreated
+from application.message_bus import IMessageBus
 
 logger = logging.getLogger("gunicorn.error")
+
 
 class TodoistController:
     def __init__(self, bus: IMessageBus):

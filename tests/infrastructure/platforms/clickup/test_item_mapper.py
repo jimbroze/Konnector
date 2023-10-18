@@ -1,11 +1,11 @@
-from datetime import datetime, date
-from pytz import timezone
-import pytest
+from datetime import date, datetime
 
+from pytz import timezone
+
+from data.platforms.clickup.repository import ClickupItemMapper
+from domain.platforms.clickup.item import ClickupItem
 from domain.platforms.clickup.item_datetime import ClickupDatetime
 from domain.platforms.clickup.priority import ClickupPriority
-from domain.platforms.clickup.item import ClickupItem
-from infrastructure.platforms.clickup.repository import ClickupItemMapper
 
 
 class TestClickupItemMapper:

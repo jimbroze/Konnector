@@ -1,15 +1,14 @@
-import json
 import logging
-from werkzeug.wrappers import Request, Response
+
 from werkzeug.exceptions import Unauthorized
+from werkzeug.wrappers import Request, Response
 
-from application.bootstrap.bootstrap import clickup_webhook_auth
+from access.platforms.clickup.auth import ClickupAuthenticator
+from application.message_bus import IMessageBus
+from bootstrap import clickup_webhook_auth
 # TODO where should this file go?
-from application.exceptions import EventNotFoundException
-
-from application.platforms.clickup.auth import ClickupAuthenticator
-from domain.platforms.clickup.events import NewClickupItemCreated, ClickupItemUpdated
-from infrastructure.message_bus import IMessageBus
+from domain.exceptions import EventNotFoundException
+from domain.platforms.clickup.events import ClickupItemUpdated, NewClickupItemCreated
 
 # TODO move auth to just using constructor?
 

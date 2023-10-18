@@ -1,8 +1,9 @@
-import pytest
 from unittest.mock import Mock
 
-from infrastructure.events import Event, EventHandler
-from infrastructure.message_bus import MessageBus
+import pytest
+
+from application.message_bus import MessageBus
+from domain.event import Event, EventHandler
 
 
 class TestEvent(Event):

@@ -1,14 +1,14 @@
-from typing import Optional
-from pytz import timezone
 import logging
-from dotenv import load_dotenv
-import requests
+from typing import Optional
 
+import requests
+from dotenv import load_dotenv
+from pytz import timezone
+
+from domain.platforms.todoist.item import TodoistItem
 # from konnector.domain.item.repositories import ItemRepository
 from domain.platforms.todoist.item_datetime import TodoistDatetime
 from domain.platforms.todoist.priority import TodoistPriority
-from domain.platforms.todoist.item import TodoistItem
-
 
 load_dotenv()
 

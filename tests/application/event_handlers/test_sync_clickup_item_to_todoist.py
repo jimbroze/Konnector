@@ -1,16 +1,17 @@
-import pytest
+from datetime import date, datetime
 from unittest.mock import Mock
-from datetime import datetime, date
-from pytz import utc, timezone
 
-from infrastructure.platforms.todoist.repository import TodoistRepository
-from infrastructure.platforms.clickup.repository import ClickupRepository
-from domain.platforms.todoist.item import TodoistPriority, TodoistDatetime, TodoistItem
-from domain.platforms.clickup.item import ClickupPriority, ClickupDatetime, ClickupItem
-from domain.platforms.clickup.events import ClickupItemUpdated
+import pytest
+from pytz import timezone, utc
+
 from application.event_handlers.sync_clickup_item_to_todoist import (
     SyncClickupItemToTodoist,
 )
+from data.platforms.clickup.repository import ClickupRepository
+from data.platforms.todoist.repository import TodoistRepository
+from domain.platforms.clickup.events import ClickupItemUpdated
+from domain.platforms.clickup.item import ClickupDatetime, ClickupItem, ClickupPriority
+from domain.platforms.todoist.item import TodoistDatetime, TodoistItem, TodoistPriority
 
 
 class TestSyncClickupItemToTodoist:

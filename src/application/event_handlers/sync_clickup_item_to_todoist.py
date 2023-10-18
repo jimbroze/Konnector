@@ -1,12 +1,12 @@
-from typing import Optional
 from datetime import datetime, timedelta
+from typing import Optional
 
-from infrastructure.events import EventHandler
-from infrastructure.platforms.clickup.repository import ClickupRepository
-from infrastructure.platforms.todoist.repository import TodoistRepository
+from data.platforms.clickup.repository import ClickupRepository
+from data.platforms.todoist.repository import TodoistRepository
+from domain.event import EventHandler
 from domain.platforms.clickup.events import ClickupItemEvent
-from domain.platforms.todoist.item import TodoistItem, TodoistPriority, TodoistDatetime
-from domain.platforms.clickup.item import ClickupItem, ClickupPriority, ClickupDatetime
+from domain.platforms.clickup.item import ClickupDatetime, ClickupItem, ClickupPriority
+from domain.platforms.todoist.item import TodoistDatetime, TodoistItem, TodoistPriority
 
 
 class SyncClickupItemToTodoist(EventHandler):

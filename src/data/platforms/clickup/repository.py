@@ -1,14 +1,14 @@
-from typing import Optional
-from pytz import timezone
 import logging
-from dotenv import load_dotenv
-import requests
+from typing import Optional
 
+import requests
+from dotenv import load_dotenv
+from pytz import timezone
+
+from domain.platforms.clickup.item import ClickupItem
 # from konnector.domain.item.repositories import ItemRepository
 from domain.platforms.clickup.item_datetime import ClickupDatetime
 from domain.platforms.clickup.priority import ClickupPriority
-from domain.platforms.clickup.item import ClickupItem
-
 
 load_dotenv()
 

@@ -1,14 +1,14 @@
-from datetime import datetime
-from pytz import timezone, utc
-import pytest
 import os
-from dotenv import load_dotenv
+from datetime import datetime
 
+import pytest
+from dotenv import load_dotenv
+from pytz import timezone, utc
+
+from data.platforms.clickup.repository import ClickupRepository
+from domain.platforms.clickup.item import ClickupItem
 from domain.platforms.clickup.item_datetime import ClickupDatetime
 from domain.platforms.clickup.priority import ClickupPriority
-from domain.platforms.clickup.item import ClickupItem
-from infrastructure.platforms.clickup.repository import ClickupRepository
-
 
 load_dotenv()
 

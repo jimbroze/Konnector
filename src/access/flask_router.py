@@ -1,9 +1,9 @@
 from flask import Flask, request
 
-from application.platforms.clickup.controller import ClickupController
-from application.platforms.todoist.controller import TodoistController
-from infrastructure.message_bus import MessageBus
-from application.bootstrap.bootstrap import clickup_webhook_auth, todoist
+from access.platforms.clickup.controller import ClickupController
+from access.platforms.todoist.controller import TodoistController
+from application.message_bus import MessageBus
+from bootstrap import clickup_webhook_auth
 
 
 class FlaskRouter:

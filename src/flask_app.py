@@ -1,10 +1,11 @@
-from flask import Flask  # render_template
 import logging
 import os
-from dotenv import load_dotenv
 
-from application.flask_router import FlaskRouter
-from application.bootstrap.bootstrap import bus
+from dotenv import load_dotenv
+from flask import Flask  # render_template
+
+from access.flask_router import FlaskRouter
+from bootstrap import bus
 
 load_dotenv()
 

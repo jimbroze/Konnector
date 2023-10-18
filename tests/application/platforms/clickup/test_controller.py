@@ -1,12 +1,13 @@
 from unittest.mock import Mock
-import pytest
-from werkzeug.wrappers import Request
-from werkzeug.test import EnvironBuilder
 
-from application.platforms.clickup.auth import ClickupAuthenticator
-from application.platforms.clickup.controller import ClickupController
+import pytest
+from werkzeug.test import EnvironBuilder
+from werkzeug.wrappers import Request
+
+from access.platforms.clickup.auth import ClickupAuthenticator
+from access.platforms.clickup.controller import ClickupController
+from application.message_bus import FakeMessageBus, MessageBus
 from domain.platforms.clickup.events import NewClickupItemCreated
-from infrastructure.message_bus import MessageBus, FakeMessageBus
 
 
 class TestClickupController:
@@ -33,9 +34,7 @@ class TestClickupController:
                     "date": "1642734631523",
                     "field": "status",
                     "parent_id": "162641062",
-                    "data": {
-                        "status_type": "open"
-                    },
+                    "data": {"status_type": "open"},
                     "source": None,
                     "user": {
                         "id": 183,
@@ -43,20 +42,20 @@ class TestClickupController:
                         "email": "john@company.com",
                         "color": "#7b68ee",
                         "initials": "J",
-                        "profilePicture": None
+                        "profilePicture": None,
                     },
                     "before": {
                         "status": None,
                         "color": "#000000",
                         "type": "removed",
-                        "orderindex": -1
+                        "orderindex": -1,
                     },
                     "after": {
                         "status": "to do",
                         "color": "#f9d900",
                         "orderindex": 0,
-                        "type": "open"
-                    }
+                        "type": "open",
+                    },
                 },
                 {
                     "id": "2800763136700363640",
@@ -72,20 +71,22 @@ class TestClickupController:
                         "email": "john@company.com",
                         "color": "#7b68ee",
                         "initials": "J",
-                        "profilePicture": None
+                        "profilePicture": None,
                     },
                     "before": None,
-                    "after": None
-                }
+                    "after": None,
+                },
             ],
             "task_id": "1vj37mc",
-            "webhook_id": "7fa3ec74-69a8-4530-a251-8a13730bd204"
+            "webhook_id": "7fa3ec74-69a8-4530-a251-8a13730bd204",
         }
 
         builder = EnvironBuilder(json=data)
         yield builder.get_request()
 
-    def test_clickup_webhooks_return_success_if_authenticated(self, message_bus: MessageBus, empty_request: Request):
+    def test_clickup_webhooks_return_success_if_authenticated(
+        self, message_bus: MessageBus, empty_request: Request
+    ):
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
 
@@ -93,7 +94,9 @@ class TestClickupController:
 
         assert response.status_code == 200
 
-    def test_clickup_webhooks_get_authenticated(self, message_bus: MessageBus, empty_request: Request):
+    def test_clickup_webhooks_get_authenticated(
+        self, message_bus: MessageBus, empty_request: Request
+    ):
         authenticator = ClickupAuthenticator("secret")
         controller = ClickupController(message_bus, authenticator)
 
@@ -101,7 +104,9 @@ class TestClickupController:
 
         assert response.status_code == 401
 
-    def test_clickup_webhook_handler_recognises_a_taskCreated_event(self, message_bus: FakeMessageBus, webhook_request: Request):
+    def test_clickup_webhook_handler_recognises_a_taskCreated_event(
+        self, message_bus: FakeMessageBus, webhook_request: Request
+    ):
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
 

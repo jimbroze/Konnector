@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from infrastructure.events import Event, EventHandler
+from domain.event import Event, EventHandler
 
 EventMappings = dict[type[Event], list[EventHandler]]
 

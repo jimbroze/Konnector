@@ -1,13 +1,12 @@
 import inspect
-from typing import Callable, Any
+from typing import Any, Callable
 
-from application.events import EVENT_MAPPINGS
-from application.platforms.clickup.auth import ClickupAuthenticator
-from application.bootstrap.config import Config
-from infrastructure.events import EventHandler
-from infrastructure.platforms.clickup.repository import ClickupRepository
-from infrastructure.platforms.todoist.repository import TodoistRepository
-from infrastructure.message_bus import MessageBus
+from access.platforms.clickup.auth import ClickupAuthenticator
+from application.event_mappings import EVENT_MAPPINGS
+from application.message_bus import MessageBus
+from config import Config
+from data.platforms.clickup.repository import ClickupRepository
+from data.platforms.todoist.repository import TodoistRepository
 
 
 def inject_dependencies(injectee: Callable, dependencies: dict[str, Any]):

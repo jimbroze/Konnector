@@ -1,7 +1,8 @@
 import hashlib
 import hmac
-from werkzeug.wrappers import Request
+
 from werkzeug.exceptions import Unauthorized
+from werkzeug.wrappers import Request
 
 
 class ClickupAuthenticator:

@@ -1,14 +1,14 @@
-from datetime import datetime
-from pytz import timezone
-import pytest
 import os
-from dotenv import load_dotenv
+from datetime import datetime
 
+import pytest
+from dotenv import load_dotenv
+from pytz import timezone
+
+from data.platforms.todoist.repository import TodoistRepository
+from domain.platforms.todoist.item import TodoistItem
 from domain.platforms.todoist.item_datetime import TodoistDatetime
 from domain.platforms.todoist.priority import TodoistPriority
-from domain.platforms.todoist.item import TodoistItem
-from infrastructure.platforms.todoist.repository import TodoistRepository
-
 
 load_dotenv()
 

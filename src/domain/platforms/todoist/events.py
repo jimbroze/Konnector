@@ -1,7 +1,8 @@
 from datetime import datetime
+
 from attrs import frozen
 
-from infrastructure.events import Event
+from domain.event import Event
 from domain.platforms.todoist.item import TodoistItem
 
 
