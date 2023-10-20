@@ -6,7 +6,7 @@ from werkzeug.wrappers import Request
 
 from access.platforms.clickup.auth import ClickupAuthenticator
 from access.platforms.clickup.controller import ClickupController, create_event
-from application.message_bus import FakeMessageBus, MessageBus
+from application.message_bus import FakeMessageBus
 from domain.platforms.clickup.events import NewClickupItemCreated
 
 
@@ -96,7 +96,7 @@ class TestClickupController:
         assert event.user_id == "183"
 
     def test_clickup_webhooks_return_success_if_authenticated(
-        self, message_bus: MessageBus, empty_request: Request
+        self, message_bus: FakeMessageBus, empty_request: Request
     ):
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
@@ -106,7 +106,7 @@ class TestClickupController:
         assert response.status_code == 200
 
     def test_clickup_webhooks_get_authenticated(
-        self, message_bus: MessageBus, empty_request: Request
+        self, message_bus: FakeMessageBus, empty_request: Request
     ):
         authenticator = ClickupAuthenticator("secret")
         controller = ClickupController(message_bus, authenticator)
