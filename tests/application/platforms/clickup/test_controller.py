@@ -5,7 +5,7 @@ from werkzeug.test import EnvironBuilder
 from werkzeug.wrappers import Request
 
 from access.platforms.clickup.auth import ClickupAuthenticator
-from access.platforms.clickup.controller import ClickupController
+from access.platforms.clickup.controller import ClickupController, create_event
 from application.message_bus import FakeMessageBus, MessageBus
 from domain.platforms.clickup.events import NewClickupItemCreated
 
@@ -24,8 +24,8 @@ class TestClickupController:
         yield builder.get_request()
 
     @pytest.fixture
-    def webhook_request(self) -> Request:
-        data = {
+    def webhook_data(self) -> dict:
+        yield {
             "event": "taskCreated",
             "history_items": [
                 {
@@ -81,8 +81,19 @@ class TestClickupController:
             "webhook_id": "7fa3ec74-69a8-4530-a251-8a13730bd204",
         }
 
-        builder = EnvironBuilder(json=data)
+    @pytest.fixture
+    def webhook_request(self, webhook_data: dict) -> Request:
+        builder = EnvironBuilder(json=webhook_data)
         yield builder.get_request()
+
+    # TODO Move to domain layer. Through "ClickupDataReceived" command?
+    # This gets the task and raises a domain event.
+    def test_clickup_taskCreated_event_can_be_created(self, webhook_data: dict):
+        event = create_event(webhook_data)
+
+        assert event.item_id == "1vj37mc"
+        assert event.list_id == "162641062"
+        assert event.user_id == "183"
 
     def test_clickup_webhooks_return_success_if_authenticated(
         self, message_bus: MessageBus, empty_request: Request
