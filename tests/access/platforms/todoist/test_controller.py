@@ -1,5 +1,4 @@
 import pytest
-
 # from unittest.mock import Mock
 from flask import Flask
 from flask.testing import FlaskClient
