@@ -101,7 +101,7 @@ class TestClickupController:
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
 
-        response = controller.clickup_webhook_handler(empty_request)
+        response = controller.webhook_handler(empty_request)
 
         assert response.status_code == 200
 
@@ -111,7 +111,7 @@ class TestClickupController:
         authenticator = ClickupAuthenticator("secret")
         controller = ClickupController(message_bus, authenticator)
 
-        response = controller.clickup_webhook_handler(empty_request)
+        response = controller.webhook_handler(empty_request)
 
         assert response.status_code == 401
 
@@ -121,7 +121,7 @@ class TestClickupController:
         authenticator = Mock(spec_set=ClickupAuthenticator)
         controller = ClickupController(message_bus, authenticator)
 
-        response = controller.clickup_webhook_handler(webhook_request)
+        response = controller.webhook_handler(webhook_request)
 
         assert len(message_bus.handled_events) == 1
         assert type(message_bus.handled_events[0]) == NewClickupItemCreated

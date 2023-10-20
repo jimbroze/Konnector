@@ -42,7 +42,7 @@ class ClickupController:
         self.bus = bus
         self.authenticator = authenticator
 
-    def clickup_webhook_handler(self, request: Request):
+    def webhook_handler(self, request: Request):
         try:
             self.authenticator.authenticate(request)
 
@@ -54,12 +54,11 @@ class ClickupController:
             self.bus.handle_events()
 
         except Unauthorized as e:
-            logger.warning(f"Error in processing clickup webhook: {repr(e)}")
+            logger.warning(f"Error in processing Clickup webhook: {repr(e)}")
             return e.get_response()
-            # Response accepted. Not necessarily success
 
         except Exception as e:
-            logger.warning(f"Error in processing clickup webhook: {repr(e)}")
+            logger.warning(f"Error in processing Clickup webhook: {repr(e)}")
 
         return Response("", 200)
         # Response accepted. Not necessarily success

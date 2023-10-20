@@ -17,10 +17,12 @@ def inject_dependencies(injectee: Callable, dependencies: dict[str, Any]):
     return injectee(**injected_dependencies)
 
 
+# TODO is a default import the best way to set these authenticators?
 clickup = ClickupRepository(Config.clickup["accessToken"], Config.clickup["timezone"])
 clickup_webhook_auth = ClickupAuthenticator(Config.clickup["secret"])
 
 todoist = TodoistRepository(Config.todoist["accessToken"], Config.todoist["timezone"])
+todoist_webhook_auth = ClickupAuthenticator(Config.todoist["secret"])
 
 # TODO rename to client
 handler_dependencies = {"clickup": clickup, "todoist": todoist}
