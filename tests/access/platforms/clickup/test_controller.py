@@ -88,7 +88,7 @@ class TestClickupController:
 
     # TODO Move to domain layer. Through "ClickupDataReceived" command?
     # This gets the task and raises a domain event.
-    def test_clickup_taskCreated_event_can_be_created(self, webhook_data: dict):
+    def test_clickup_task_created_event_can_be_created(self, webhook_data: dict):
         event = create_event(webhook_data)
 
         assert event.item_id == "1vj37mc"
@@ -115,7 +115,7 @@ class TestClickupController:
 
         assert response.status_code == 401
 
-    def test_clickup_webhook_handler_recognises_a_taskCreated_event(
+    def test_clickup_webhook_handler_recognises_a_task_created_event(
         self, message_bus: FakeMessageBus, webhook_request: Request
     ):
         authenticator = Mock(spec_set=ClickupAuthenticator)

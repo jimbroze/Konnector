@@ -1,15 +1,13 @@
-from datetime import datetime
-
 from attrs import frozen
 
 from domain.event import Event
-from domain.platforms.todoist.item import TodoistItem
 
 
 @frozen
 class TodoistItemEvent(Event):
-    todoist_item: TodoistItem
-    event_time: datetime
+    task_id: str
+    project_id: str
+    user_id: str
 
 
 class NewTodoistItemCreated(TodoistItemEvent):
