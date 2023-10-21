@@ -50,8 +50,5 @@ class FakeMessageBus(IMessageBus):
 
     def handle_events(self):
         for registered_event in self.registered_events:
-            for handler in self.event_mappings.get(type(registered_event), []):
-                handler.handle(registered_event)
-
             self.handled_events.append(registered_event)
             self.registered_events.remove(registered_event)
