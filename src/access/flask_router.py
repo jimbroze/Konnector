@@ -26,7 +26,7 @@ class FlaskRouter:
         )
 
     def clickup_route(self):
-        return self.clickupController.clickup_webhook_handler(request)
+        return self.clickupController.webhook_handler(request)
 
     def todoist_route(self):
-        return self.todoistController.todoist_webhook_handler(request)
+        return self.todoistController.webhook_handler(request)

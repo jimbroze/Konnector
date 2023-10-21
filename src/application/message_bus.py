@@ -16,10 +16,10 @@ class IMessageBus(ABC):
 
 
 class MessageBus(IMessageBus):
-    registered_events: list[Event] = []
-
     def __init__(self, event_mappings: EventMappings):
         self.event_mappings = event_mappings
+
+        self.registered_events: list[Event] = []
 
     def register(self, event: EventMappings):
         if not isinstance(event, Event):
@@ -36,11 +36,11 @@ class MessageBus(IMessageBus):
 
 
 class FakeMessageBus(IMessageBus):
-    registered_events: list[Event] = []
-    handled_events: list[Event] = []
-
     def __init__(self, event_mappings: EventMappings):
         self.event_mappings = event_mappings
+
+        self.registered_events: list[Event] = []
+        self.handled_events: list[Event] = []
 
     def register(self, event: Event):
         if not isinstance(event, Event):

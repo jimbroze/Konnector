@@ -33,9 +33,7 @@ class SyncClickupItemToTodoist(EventHandler):
 
         matches_criteria = self.next_actions_criteria(clickup_item)
 
-        todoist_item = self.get_clickup_item_in_todoist(
-            clickup_item, "next_actions"
-        )
+        todoist_item = self.get_clickup_item_in_todoist(clickup_item, "next_actions")
         if matches_criteria:
             if todoist_item:
                 todoist_result_item = self.todoist.update_item(todoist_item)

@@ -25,11 +25,7 @@ class TestMoveNewTodoistItemToClickup:
         )
         yield event_handler
 
-    # def teardown_method(self):
-    #     self.test_event = None
-    #     self.event_mappings = {}
-
-    def test_todoistPriorityToClickup_converts_priority(
+    def test_todoist_priority_to_clickup_converts_priority(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
         todoist_priority_default = TodoistPriority(1)
@@ -50,7 +46,7 @@ class TestMoveNewTodoistItemToClickup:
         assert clickup_priority_mid.to_int() == 2
         assert clickup_priority_high.to_int() == 1
 
-    def test_todoistPriorityToClickup_keeps_null_priority(
+    def test_todoist_priority_to_clickup_keeps_null_priority(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
         todoist_priority = None
@@ -59,7 +55,7 @@ class TestMoveNewTodoistItemToClickup:
 
         assert clickup_priority is None
 
-    def test_todoistDatetimeToClickup_converts_utc_datetime(
+    def test_todoist_datetime_to_clickup_converts_utc_datetime(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
         todoist_date = TodoistDatetime.from_date(date(2023, 11, 10), utc)
@@ -79,7 +75,7 @@ class TestMoveNewTodoistItemToClickup:
         )
         assert clickup_datetime.contains_time() is True
 
-    def test_todoistDatetimeToClickup_converts_non_utc_datetime(
+    def test_todoist_datetime_to_clickup_converts_non_utc_datetime(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
         todoist_date = TodoistDatetime.from_date(
@@ -103,7 +99,7 @@ class TestMoveNewTodoistItemToClickup:
         )
         assert clickup_datetime.contains_time() is True
 
-    def test_todoistDatetimeToClickup_keeps_null_datetime(
+    def test_todoist_datetime_to_clickup_keeps_null_datetime(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
         todoist_datetime = None
@@ -112,7 +108,7 @@ class TestMoveNewTodoistItemToClickup:
 
         assert clickup_datetime is None
 
-    def test_todoistItemToClickup_converts_todoist_item_to_clickup(
+    def test_todoist_datetime_to_clickup_converts_todoist_item_to_clickup(
         self, event_handler: MoveNewTodoistItemToClickup
     ):
         todoist_item = TodoistItem(
